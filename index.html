@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>QRCrashTest - QRコード破壊耐性クラッシュテスト</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>QRCrashTest</h1>
+    <p class="subtitle">QRコードに影・汚れ・欠損を与えて、構造と誤り訂正による読み取り耐性を可視化する教育ツール</p>
+  </header>
+
+  <main>
+    <!-- ローディングインジケーター -->
+    <div id="loadingOverlay" class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <p>読み込み中...</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-button active" data-tab="tab-crash">クラッシュテスト</button>
+      <button class="tab-button" data-tab="tab-analyze">解析</button>
+      <button class="tab-button" data-tab="tab-study">座学</button>
+    </div>
+
+    <!-- タブ1: Crash Test -->
+    <section id="tab-crash" class="tab-content active">
+      <!-- 読み込みセクション -->
+      <div class="load-section">
+        <div class="load-section-left">
+          <section class="panel">
+            <h2>QRコード読み込み</h2>
+            <div class="load-drop-zone" id="loadDropZone">
+              <div class="file-input-row">
+                <input type="file" id="fileInput" accept="image/*">
+              </div>
+              <p class="hint">
+                📁 PNG / JPG などのQRコード画像を読み込みます。<br>
+                <strong>この領域にドラッグ＆ドロップ</strong>することもできます。
+              </p>
+            </div>
+            <div class="sample-qr-section">
+              <label>
+                <strong>サンプルQRコード：</strong>
+                <select id="sampleQrSelect">
+                  <option value="">選択してください</option>
+                  <option value="sample1">サンプル1 (Version 1, URL)</option>
+                  <option value="sample2">サンプル2 (Version 5, 長文)</option>
+                  <option value="sample3">サンプル3 (Version 10, 大容量)</option>
+                </select>
+              </label>
+            </div>
+          </section>
+        </div>
+        <div class="load-section-right">
+          <section class="panel">
+            <h2>使い方</h2>
+            <ol style="margin: 0; padding-left: 1.5rem; line-height: 1.7;">
+              <li>QRコード画像を読み込みます</li>
+              <li>ダメージツールを選んでキャンバスに描画します</li>
+              <li>読み取り結果をリアルタイムで確認します</li>
+              <li>攻撃プリセットで典型的なダメージを試せます</li>
+            </ol>
+            <p class="hint" style="margin-top: 0.8rem;">
+              QRコードの構造と誤り訂正の働きを体験的に理解できます。
+            </p>
+          </section>
+        </div>
+      </div>
+
+      <!-- メインコンテンツエリア（QR読み込み後に表示） -->
+      <div class="crash-main-content" id="crashMainContent">
+        <!-- 上段: QRコードと情報 -->
+        <div class="crash-top-row">
+          <div class="crash-qr-area">
+            <div class="canvas-wrapper" id="canvasDropZone">
+              <canvas id="baseCanvas" width="500" height="500"></canvas>
+              <canvas id="overlayCanvas" width="500" height="500"></canvas>
+              <canvas id="previewCanvas" width="500" height="500"></canvas>
+              <canvas id="damageHeatmapCanvas" width="500" height="500"></canvas>
+              <div id="noImageOverlay" class="no-image-overlay">
+                <p>📁 QRコード画像をドラッグ＆ドロップ<br>または上のボタンから読み込んでください</p>
+              </div>
+            </div>
+          </div>
+          <div class="crash-info-area">
+            <section class="panel">
+              <h2>読み取り結果</h2>
+              <div class="status-badge-container">
+                <span id="decodeStatus" class="status-badge status-idle" title="QRコード読み取り状態">未読込</span>
+              </div>
+              <div class="status-grid">
+                <div>
+                  <span class="label" title="ダメージが占める割合">破損率：</span>
+                  <span id="damageRatio">-</span>
+                </div>
+                <div>
+                  <span class="label" title="誤り訂正レベル（jsQRでは取得不可）">ECC：</span>
+                  <span id="eccLevel">不明</span>
+                </div>
+                <div>
+                  <span class="label" title="QRコードのバージョン">バージョン：</span>
+                  <span id="qrVersion">不明</span>
+                </div>
+              </div>
+              <div class="url-box">
+                <div class="label">復号データ：</div>
+                <pre id="decodedData" class="decoded-data"></pre>
+              </div>
+              <div class="qr-details" id="qrDetails" style="display: none;">
+                <h3>QR詳細情報</h3>
+                <div class="detail-grid">
+                  <div>
+                    <span class="label">画像サイズ：</span>
+                    <span id="imageSize">-</span>
+                  </div>
+                  <div>
+                    <span class="label">推定モジュール数：</span>
+                    <span id="moduleCount">-</span>
+                  </div>
+                  <div>
+                    <span class="label">データ長：</span>
+                    <span id="dataLength">-</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- 下段: ダメージツールと攻撃プリセット -->
+        <div class="crash-bottom-row">
+          <div class="crash-tools-area">
+            <section class="panel">
+              <h2>ダメージツール</h2>
+              <p class="hint">
+                キャンバス上にダメージを描画できます。描画のたびに自動的に読み取りテストが実行されます。
+              </p>
+              <div class="current-tool-display">
+                <span id="currentToolIcon">✏️</span>
+                <span id="currentToolName">ペン</span>
+              </div>
+              <div class="tool-row">
+                <label class="tool-button" title="自由に線を描いてQRコードを破壊">
+                  <input type="radio" name="tool" value="pen" checked>
+                  <span class="tool-icon">✏️</span>
+                  <span class="tool-label">ペン</span>
+                </label>
+                <label class="tool-button" title="散発的な汚れを付着させる">
+                  <input type="radio" name="tool" value="dust">
+                  <span class="tool-icon">💧</span>
+                  <span class="tool-label">汚れブラシ</span>
+                </label>
+                <label class="tool-button" title="楕円形の影をかける">
+                  <input type="radio" name="tool" value="shadow">
+                  <span class="tool-icon">🌑</span>
+                  <span class="tool-label">影</span>
+                </label>
+                <label class="tool-button" title="矩形のステッカーを貼り付ける">
+                  <input type="radio" name="tool" value="mask">
+                  <span class="tool-icon">📄</span>
+                  <span class="tool-label">ステッカー</span>
+                </label>
+                <label class="tool-button" title="ランダムなノイズを発生させる">
+                  <input type="radio" name="tool" value="noise">
+                  <span class="tool-icon">⚡</span>
+                  <span class="tool-label">ノイズ</span>
+                </label>
+              </div>
+
+              <div class="control-row">
+                <label>
+                  ブラシサイズ: <strong><span id="sizeValue">20</span>px</strong>
+                  <input type="range" id="sizeSlider" min="3" max="60" value="20">
+                </label>
+              </div>
+
+              <div class="control-row">
+                <label>
+                  影の濃さ: <strong><span id="shadowOpacityValue">40</span>%</strong>
+                  <input type="range" id="shadowOpacitySlider" min="10" max="80" value="40">
+                </label>
+              </div>
+
+              <div class="control-row">
+                <label>
+                  汚れ／ノイズ密度: <strong><span id="noiseDensityValue">5</span></strong>
+                  <input type="range" id="noiseDensitySlider" min="1" max="10" value="5">
+                </label>
+              </div>
+
+              <div class="control-row">
+                <label>
+                  ステッカー色
+                  <select id="maskColorSelect">
+                    <option value="white">白</option>
+                    <option value="black">黒</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="control-row">
+                <label>
+                  <input type="checkbox" id="showDamageHeatmap">
+                  ダメージヒートマップを表示
+                  <span class="tooltip-icon" data-tooltip="ダメージを受けた領域を赤色のヒートマップで可視化します。破損の分布を直感的に把握できます。">?</span>
+                </label>
+              </div>
+
+              <div class="button-row">
+                <button id="clearOverlayButton" title="すべてのダメージをクリア">ダメージをリセット</button>
+              </div>
+            </section>
+          </div>
+          <div class="crash-presets-area">
+            <section class="panel">
+              <h2>攻撃シナリオプリセット</h2>
+              <p class="hint">押すたびにランダムな位置にダメージを追加します。</p>
+
+              <div class="preset-item">
+                <div class="preset-info">
+                  <strong>🎯 Finder破壊</strong>
+                  <p class="preset-desc">3つのFinderパターンのいずれかをランダムに攻撃。位置検出の要なので致命的。</p>
+                </div>
+                <button class="preset-button" data-preset="finder-attack">適用</button>
+              </div>
+
+              <div class="preset-item">
+                <div class="preset-info">
+                  <strong>💥 Data汚損</strong>
+                  <p class="preset-desc">Data領域に散発的な汚れを付着。誤り訂正があるため意外と読めてしまうことも。</p>
+                </div>
+                <button class="preset-button" data-preset="data-scatter">適用</button>
+              </div>
+
+              <div class="preset-item">
+                <div class="preset-info">
+                  <strong>📏 Timing攻撃</strong>
+                  <p class="preset-desc">横または縦のTimingパターンを破壊。モジュール位置の基準を狂わせる。</p>
+                </div>
+                <button class="preset-button" data-preset="timing-damage">適用</button>
+              </div>
+
+              <div class="preset-item">
+                <div class="preset-info">
+                  <strong>🌫️ 全体劣化</strong>
+                  <p class="preset-desc">全体にランダムな汚れを散布。経年劣化や印刷品質の悪さを再現。</p>
+                </div>
+                <button class="preset-button" data-preset="global-dirt">適用</button>
+              </div>
+
+              <div class="preset-item">
+                <div class="preset-info">
+                  <strong>📌 角ステッカー</strong>
+                  <p class="preset-desc">4つの角のいずれかにステッカーを貼付。位置によってはFinderを覆う。</p>
+                </div>
+                <button class="preset-button" data-preset="corner-sticker">適用</button>
+              </div>
+
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- タブ2: Analyze -->
+    <section id="tab-analyze" class="tab-content">
+      <!-- 解析タブの説明 -->
+      <div class="analysis-intro">
+        <h3>📊 このタブでできること</h3>
+        <p>
+          読み込んだQRコードの内部構造を可視化し、「どこを破壊すると致命的か」を分析します。<br>
+          Finder・Timing・Format・Data領域を色分けして表示し、破壊耐性の理解を深めます。
+        </p>
+      </div>
+
+      <div class="analyze-panes">
+        <div class="pane pane-left">
+          <div class="canvas-wrapper analysis-wrapper">
+            <canvas id="analysisCanvas" width="500" height="500"></canvas>
+            <div id="analysisNoImageOverlay" class="no-image-overlay">
+              <p>Crash TestタブでQRコードを読み込むと<br>構造解析が表示されます。</p>
+            </div>
+          </div>
+        </div>
+        <div class="pane pane-right">
+
+        <section class="panel">
+          <h2>QRコード解析</h2>
+          <div class="section-description">
+            <p>
+              <strong>使い方：</strong>Crash TestタブでQRコードを読み込み後、下のボタンを押してください。<br>
+              jsQRライブラリでQRコードの位置情報を検出し、各構造領域を正確に計算して表示します。
+            </p>
+          </div>
+          <button id="analyzeButton" class="analyze-button" disabled>
+            🔍 QRコードを解析
+          </button>
+          <p class="hint" id="analyzeHint">
+            左側でQRコードを読み込んでください
+          </p>
+        </section>
+
+        <section class="panel">
+          <h2>構造レイヤー</h2>
+          <div class="section-description">
+            <p>
+              左側のキャンバスに表示する領域を選択できます。各領域の役割を理解しながら、ON/OFFを切り替えてみてください。
+            </p>
+          </div>
+          <div class="control-column">
+            <label title="3つの角にある7×7マスの正方形パターン。QRコードの位置・向き・サイズを検出する最重要パーツ。">
+              <input type="checkbox" id="layerFinder" checked>
+              Finder（位置検出パターン）
+            </label>
+            <label title="Finderを結ぶ白黒交互のライン。各モジュール（マス）の座標を正確に特定するための基準線。">
+              <input type="checkbox" id="layerTiming" checked>
+              Timing（タイミングパターン）
+            </label>
+            <label title="誤り訂正レベルやマスクパターンを記録した領域。Finderの近くに配置されます。">
+              <input type="checkbox" id="layerFormat" checked>
+              Format情報
+            </label>
+            <label title="実際のデータ（URL・テキストなど）が記録されている領域。誤り訂正により一部破損しても復元可能。">
+              <input type="checkbox" id="layerData" checked>
+              Data領域（モデル）
+            </label>
+            <label title="破損した場合の致命度を色で表現。赤い領域ほど「当たりどころが悪い」危険ゾーン。">
+              <input type="checkbox" id="layerHeatmap" checked>
+              致命度ヒートマップ（モデル）
+            </label>
+          </div>
+          <p class="hint">
+            解析ボタンを押すと、jsQRで検出された実際の位置情報から各領域を計算して表示します。
+          </p>
+        </section>
+
+        <section class="panel">
+          <h2>致命ゾーン概要（モデル）</h2>
+          <div class="section-description">
+            <p>
+              ヒートマップの統計情報を表示します。赤いセルが多いほど「当たりどころの悪い場所」が多いことを意味します。
+            </p>
+          </div>
+          <div class="status-grid">
+            <div>
+              <span class="label">致命度が高いセル：</span>
+              <span id="highRiskRatio">-</span>
+            </div>
+            <div>
+              <span class="label">Finder周辺平均：</span>
+              <span id="finderScore">-</span>
+            </div>
+            <div>
+              <span class="label">Data領域平均：</span>
+              <span id="dataScore">-</span>
+            </div>
+          </div>
+          <p class="hint">
+            赤に近いほど「当たりどころが悪い」領域です。<br>
+            FinderやTimingに重なるセルは特に致命度が高く、わずかな破損でも読み取り不可になる可能性があります。
+          </p>
+        </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- タブ3: Study -->
+    <section id="tab-study" class="tab-content">
+      <article class="study-article">
+        <div class="study-intro">
+          <p>QRコードの構造と破壊耐性について、基礎から応用まで段階的に学習できます。</p>
+        </div>
+
+        <!-- 基礎セクション -->
+        <div class="study-section">
+          <h2 class="study-section-header">
+            <button class="study-toggle" data-target="study-basics-1">
+              <span class="toggle-icon">▶</span>
+              <span>【基礎1】QRコードの基本構造</span>
+            </button>
+          </h2>
+          <div class="study-section-content collapsed" id="study-basics-1">
+            <p>
+              QRコードは、一見すると単なるモザイク模様に見えますが、内部はきちんと役割の異なる領域で構成されています。
+            </p>
+
+            <div class="diagram-container">
+              <div class="qr-diagram-wrapper">
+                <div class="qr-diagram-display">
+                  <svg viewBox="0 0 250 250" class="qr-colored-diagram" id="coloredQrDiagram">
+                    <!-- 実際のURLからQRコードを生成して色分け表示 -->
+                  </svg>
+                  <svg viewBox="0 0 250 250" class="qr-highlight-overlay" id="highlightOverlay">
+                    <!-- ハイライト用オーバーレイ -->
+                  </svg>
+                </div>
+                <p class="qr-url-display">URL: https://hack.booth.pm/items/7517001</p>
+                <p class="qr-coordinate-display" id="qrCoordinateDisplay">座標: -</p>
+              </div>
+              <p class="diagram-caption">図1: QRコードの構成要素をピクセル単位で色分け表示（下の要素にホバーでハイライト）</p>
+            </div>
+
+            <h4>主要な構成要素</h4>
+            <ul class="component-list">
+              <li data-component="finder"><strong style="color: #2196F3;">位置検出パターン（Finder）</strong> - 三隅にある大きな四角型のパターン。QRコードの位置と向きを特定します。</li>
+              <li data-component="timing"><strong style="color: #4CAF50;">タイミングパターン（Timing）</strong> - 縦横の細いシマ模様。モジュールの座標を決定します。</li>
+              <li data-component="format"><strong style="color: #9C27B0;">Format情報</strong> - バージョンや誤り訂正レベルなどのメタ情報を格納します。</li>
+              <li data-component="data"><strong style="color: #FF9800;">Data + ECC領域</strong> - 実際のデータ（URL、テキストなど）を表す<strong>データコードワード</strong>と、破損を復元するための<strong>誤り訂正コードワード（ECC）</strong>が交互に配置されています。</li>
+            </ul>
+            <p>
+              これらの領域は、それぞれ異なる重要度を持ちます。特にFinderやTimingは「構造を支えるパーツ」として、
+              わずかな破損でも致命的な影響を与える可能性があります。
+            </p>
+            <p class="note">
+              💡 <strong>注記：</strong> Data + ECC領域では、実際のデータと誤り訂正コードが複雑にインターリーブ（交互配置）されているため、
+              本ツールではこれらを一つの「Data + ECC領域」として簡略化して表示しています。厳密な配置は、QRコードのバージョン（サイズ）と誤り訂正レベルによって異なります（詳しくは<strong>基礎2</strong>を参照してください）。
+            </p>
+          </div>
+        </div>
+
+        <div class="study-section">
+          <h2 class="study-section-header">
+            <button class="study-toggle" data-target="study-basics-2">
+              <span class="toggle-icon">▶</span>
+              <span>【基礎2】誤り訂正の仕組み</span>
+            </button>
+          </h2>
+          <div class="study-section-content collapsed" id="study-basics-2">
+            <p>
+              基礎1で、<strong style="color: #FF9800;">Data + ECC領域</strong>には「データコードワード」と「誤り訂正コードワード（ECC）」が交互配置されていることを学びました。
+              この誤り訂正の仕組みこそが、QRコードが一部破損しても読み取れる理由です。
+            </p>
+            <p>
+              QRコードには<strong>誤り訂正符号</strong>が組み込まれており、一部がかすれたり汚れたりしても自動的に復元できる仕組みがあります。
+              これは「<strong>リードソロモン符号</strong>」という技術に基づいています。
+            </p>
+
+            <div class="diagram-container">
+              <svg viewBox="0 0 400 180" class="ecc-diagram">
+                <!-- Level L -->
+                <g>
+                  <rect x="10" y="10" width="80" height="80" fill="#4CAF50" stroke="#2E7D32" stroke-width="2"/>
+                  <rect x="10" y="10" width="5.6" height="80" fill="#F44336" opacity="0.8"/>
+                  <text x="50" y="105" text-anchor="middle" font-size="12" font-weight="bold">Level L</text>
+                  <text x="50" y="120" text-anchor="middle" font-size="10">復元力: 7%</text>
+                  <text x="50" y="135" text-anchor="middle" font-size="10" fill="#666">データ量: 大</text>
+                </g>
+
+                <!-- Level M -->
+                <g>
+                  <rect x="110" y="10" width="80" height="80" fill="#8BC34A" stroke="#558B2F" stroke-width="2"/>
+                  <rect x="110" y="10" width="12" height="80" fill="#F44336" opacity="0.8"/>
+                  <text x="150" y="105" text-anchor="middle" font-size="12" font-weight="bold">Level M</text>
+                  <text x="150" y="120" text-anchor="middle" font-size="10">復元力: 15%</text>
+                  <text x="150" y="135" text-anchor="middle" font-size="10" fill="#666">データ量: 中</text>
+                </g>
+
+                <!-- Level Q -->
+                <g>
+                  <rect x="210" y="10" width="80" height="80" fill="#FFC107" stroke="#F57C00" stroke-width="2"/>
+                  <rect x="210" y="10" width="20" height="80" fill="#F44336" opacity="0.8"/>
+                  <text x="250" y="105" text-anchor="middle" font-size="12" font-weight="bold">Level Q</text>
+                  <text x="250" y="120" text-anchor="middle" font-size="10">復元力: 25%</text>
+                  <text x="250" y="135" text-anchor="middle" font-size="10" fill="#666">データ量: 小</text>
+                </g>
+
+                <!-- Level H -->
+                <g>
+                  <rect x="310" y="10" width="80" height="80" fill="#FF9800" stroke="#E65100" stroke-width="2"/>
+                  <rect x="310" y="10" width="24" height="80" fill="#F44336" opacity="0.8"/>
+                  <text x="350" y="105" text-anchor="middle" font-size="12" font-weight="bold">Level H</text>
+                  <text x="350" y="120" text-anchor="middle" font-size="10">復元力: 30%</text>
+                  <text x="350" y="135" text-anchor="middle" font-size="10" fill="#666">データ量: 最小</text>
+                </g>
+
+                <!-- 凡例 -->
+                <rect x="10" y="150" width="15" height="15" fill="#4CAF50"/>
+                <text x="30" y="162" font-size="10">データ領域</text>
+                <rect x="110" y="150" width="15" height="15" fill="#F44336" opacity="0.8"/>
+                <text x="130" y="162" font-size="10">誤り訂正符号</text>
+              </svg>
+              <p class="diagram-caption">図2: 誤り訂正レベルごとのデータ量と復元能力の比較</p>
+            </div>
+
+            <h4>誤り訂正レベル（ECC）</h4>
+            <ul>
+              <li><strong>Level L（Low）</strong> - 約7%の復元能力。データ容量を優先する場合に適しています。</li>
+              <li><strong>Level M（Medium）</strong> - 約15%の復元能力。バランスの取れた標準的な設定です。</li>
+              <li><strong>Level Q（Quartile）</strong> - 約25%の復元能力。やや汚れやすい環境向けです。</li>
+              <li><strong>Level H（High）</strong> - 約30%の復元能力。もっとも高い耐性を持ちますが、データ量は少なくなります。</li>
+            </ul>
+            <p>
+              <strong>トレードオフ：</strong>高いECCレベルほど多くの欠損に耐えられますが、その分、格納できるデータ量は減少します。
+            </p>
+
+            <h4>Data + ECC領域の内部構成とインターリーブ</h4>
+            <p>
+              基礎1で言及した「<strong style="color: #FF9800;">Data + ECC領域</strong>」について、もう少し詳しく見てみましょう。
+              この領域は、実際には次の2つの要素が複雑に混ざり合っています：
+            </p>
+            <ul>
+              <li><strong>データコードワード</strong> - 実際のURL、テキスト、バイナリデータなど、読み取りたい情報そのもの</li>
+              <li><strong>誤り訂正コードワード（ECC）</strong> - データが破損した際に復元するための冗長情報（上記のリードソロモン符号）</li>
+            </ul>
+            <p>
+              これら2つは単純に「前半がデータ、後半がECC」という並びではなく、QRコード全体に<strong>インターリーブ（交互配置）</strong>されています。
+              つまり、データとECCが細かく入り混じって配置されているため、ある特定の場所が破損しても、周辺のECC情報から復元できる可能性が高まります。
+            </p>
+            <p>
+              このインターリーブパターンは、<strong>QRコードのバージョン（サイズ／モジュール数）</strong>と<strong>上記の誤り訂正レベル（L/M/Q/H）</strong>の組み合わせによって決定されます。
+              例えば、バージョン1（21×21モジュール）とバージョン10（57×57モジュール）では配置パターンが異なり、
+              同じバージョンでもECCレベルLとHでは配置が変わります。
+            </p>
+            <p>
+              このように、厳密な可視化は非常に複雑になるため、本ツールでは教育目的として、Data + ECCを一つの<strong style="color: #FF9800;">オレンジ色の領域</strong>としてシンプルに表現しています。
+            </p>
+
+            <p class="note">
+              ※ 本ツールではjsQRライブラリの制限により、ECCレベルを直接取得できないため「不明」と表示されます。
+            </p>
+          </div>
+        </div>
+
+        <div class="study-section">
+          <h2 class="study-section-header">
+            <button class="study-toggle" data-target="study-basics-3">
+              <span class="toggle-icon">▶</span>
+              <span>【基礎3】アライメントパターンとバージョン</span>
+            </button>
+          </h2>
+          <div class="study-section-content collapsed" id="study-basics-3">
+            <p>
+              基礎1で学んだ構成要素に加えて、<strong>バージョン2以上のQRコード</strong>には<strong>アライメントパターン（Alignment Pattern）</strong>という追加の構造要素が存在します。
+            </p>
+
+            <div class="diagram-container">
+              <svg viewBox="0 0 450 200" class="alignment-diagram">
+                <!-- バージョン1（アライメントなし） -->
+                <g>
+                  <rect x="10" y="10" width="80" height="80" fill="#f5f5f5" stroke="#999" stroke-width="1"/>
+                  <!-- Finder -->
+                  <rect x="15" y="15" width="20" height="20" fill="#2196F3"/>
+                  <rect x="65" y="15" width="20" height="20" fill="#2196F3"/>
+                  <rect x="15" y="65" width="20" height="20" fill="#2196F3"/>
+                  <!-- Timing -->
+                  <line x1="40" y1="25" x2="60" y2="25" stroke="#4CAF50" stroke-width="2"/>
+                  <line x1="25" y1="40" x2="25" y2="60" stroke="#4CAF50" stroke-width="2"/>
+                  <text x="50" y="105" text-anchor="middle" font-size="11" font-weight="bold">バージョン1</text>
+                  <text x="50" y="120" text-anchor="middle" font-size="9" fill="#666">21×21 モジュール</text>
+                  <text x="50" y="133" text-anchor="middle" font-size="9" fill="#c00">アライメント：なし</text>
+                </g>
+
+                <!-- バージョン2（アライメント1個） -->
+                <g>
+                  <rect x="120" y="10" width="100" height="100" fill="#f5f5f5" stroke="#999" stroke-width="1"/>
+                  <!-- Finder -->
+                  <rect x="125" y="15" width="22" height="22" fill="#2196F3"/>
+                  <rect x="193" y="15" width="22" height="22" fill="#2196F3"/>
+                  <rect x="125" y="83" width="22" height="22" fill="#2196F3"/>
+                  <!-- Timing -->
+                  <line x1="152" y1="26" x2="188" y2="26" stroke="#4CAF50" stroke-width="2"/>
+                  <line x1="136" y1="42" x2="136" y2="78" stroke="#4CAF50" stroke-width="2"/>
+                  <!-- Alignment（右下に1個） -->
+                  <circle cx="195" cy="95" r="6" fill="none" stroke="#E91E63" stroke-width="2"/>
+                  <circle cx="195" cy="95" r="2" fill="#E91E63"/>
+                  <text x="170" y="125" text-anchor="middle" font-size="11" font-weight="bold">バージョン2</text>
+                  <text x="170" y="140" text-anchor="middle" font-size="9" fill="#666">25×25 モジュール</text>
+                  <text x="170" y="153" text-anchor="middle" font-size="9" fill="#E91E63">アライメント：1個</text>
+                </g>
+
+                <!-- バージョン7（アライメント複数） -->
+                <g>
+                  <rect x="250" y="10" width="140" height="140" fill="#f5f5f5" stroke="#999" stroke-width="1"/>
+                  <!-- Finder -->
+                  <rect x="255" y="15" width="28" height="28" fill="#2196F3"/>
+                  <rect x="357" y="15" width="28" height="28" fill="#2196F3"/>
+                  <rect x="255" y="117" width="28" height="28" fill="#2196F3"/>
+                  <!-- Timing -->
+                  <line x1="288" y1="29" x2="352" y2="29" stroke="#4CAF50" stroke-width="2"/>
+                  <line x1="269" y1="48" x2="269" y2="112" stroke="#4CAF50" stroke-width="2"/>
+                  <!-- Alignment（6個配置、Finder領域を避けて配置） -->
+                  <!-- (6,22) - 左上Finderの右側 -->
+                  <circle cx="268" cy="78" r="7" fill="none" stroke="#E91E63" stroke-width="2"/>
+                  <circle cx="268" cy="78" r="2" fill="#E91E63"/>
+                  <!-- (22,6) - 左上Finderの下側 -->
+                  <circle cx="318" cy="28" r="7" fill="none" stroke="#E91E63" stroke-width="2"/>
+                  <circle cx="318" cy="28" r="2" fill="#E91E63"/>
+                  <!-- (22,22) - 中央 -->
+                  <circle cx="318" cy="78" r="7" fill="none" stroke="#E91E63" stroke-width="2"/>
+                  <circle cx="318" cy="78" r="2" fill="#E91E63"/>
+                  <!-- (22,38) - 下側中央 -->
+                  <circle cx="318" cy="128" r="7" fill="none" stroke="#E91E63" stroke-width="2"/>
+                  <circle cx="318" cy="128" r="2" fill="#E91E63"/>
+                  <!-- (38,22) - 右側中央 -->
+                  <circle cx="368" cy="78" r="7" fill="none" stroke="#E91E63" stroke-width="2"/>
+                  <circle cx="368" cy="78" r="2" fill="#E91E63"/>
+                  <!-- (38,38) - 右下 -->
+                  <circle cx="368" cy="128" r="7" fill="none" stroke="#E91E63" stroke-width="2"/>
+                  <circle cx="368" cy="128" r="2" fill="#E91E63"/>
+                  <text x="320" y="170" text-anchor="middle" font-size="11" font-weight="bold">バージョン7</text>
+                  <text x="320" y="185" text-anchor="middle" font-size="9" fill="#666">45×45 モジュール</text>
+                  <text x="320" y="198" text-anchor="middle" font-size="9" fill="#E91E63">アライメント：6個</text>
+                </g>
+
+                <!-- 凡例 -->
+                <rect x="10" y="165" width="16" height="16" fill="#2196F3" stroke="#1976D2" stroke-width="1"/>
+                <text x="32" y="178" font-size="12" font-weight="500">Finder</text>
+                <line x1="90" y1="173" x2="110" y2="173" stroke="#4CAF50" stroke-width="3"/>
+                <text x="116" y="178" font-size="12" font-weight="500">Timing</text>
+                <circle cx="192" cy="173" r="7" fill="none" stroke="#E91E63" stroke-width="2.5"/>
+                <circle cx="192" cy="173" r="2.5" fill="#E91E63"/>
+                <text x="205" y="178" font-size="12" font-weight="500">Alignment</text>
+              </svg>
+              <p class="diagram-caption">図3: QRコードのバージョンによるアライメントパターンの配置</p>
+            </div>
+
+            <h4>アライメントパターンとは</h4>
+            <p>
+              <strong style="color: #E91E63;">アライメントパターン</strong>は、QRコードの内部に配置される小さな同心円状のマークです。
+              Finderパターンが「QRコード全体の位置と向き」を特定するのに対し、アライメントパターンは「内部の歪み補正」を担当します。
+            </p>
+
+            <h4>バージョンによる配置の違い</h4>
+            <ul>
+              <li><strong>バージョン1</strong>（21×21モジュール） - アライメントパターンは<strong>存在しません</strong>。サイズが小さいため、Finderだけで十分な精度が得られます。</li>
+              <li><strong>バージョン2～6</strong>（25×25～41×41モジュール） - <strong>1個</strong>のアライメントパターンが右下付近に配置されます。</li>
+              <li><strong>バージョン7以上</strong>（45×45モジュール～） - QRコードが大きくなるほど、<strong>複数個</strong>のアライメントパターンがグリッド状に配置されます（バージョン7では6個、最大バージョン40では46個）。</li>
+            </ul>
+
+            <h4>役割と重要性</h4>
+            <p>
+              アライメントパターンは、次のような状況で重要な役割を果たします：
+            </p>
+            <ul>
+              <li><strong>物理的な歪み</strong> - 印刷された紙が曲がっている、シールが貼られた表面が湾曲しているなど</li>
+              <li><strong>撮影時の角度</strong> - カメラがQRコードを斜めから撮影した場合の透視歪み</li>
+              <li><strong>大型QRコード</strong> - サイズが大きいほど、端と中心で歪みの影響が異なるため、内部の基準点が必要</li>
+            </ul>
+            <p>
+              図1のQRコードを見ると、これは<strong>バージョン3</strong>（29×29モジュール）であり、
+              右下付近に1個のアライメントパターンが配置されているはずです。ただし、Data + ECC領域として簡略表示しているため、この図では明示していません。
+            </p>
+
+            <p class="note">
+              💡 <strong>クラッシュテストでの意味：</strong> アライメントパターンもFinderと同様に構造を支える要素なので、
+              ここが破損すると大型QRコードでは読み取り精度が低下します。特にバージョン7以上の大型QRで実験する際は、アライメント付近のダメージにも注目してみてください。
+            </p>
+          </div>
+        </div>
+
+        <!-- 応用セクション -->
+        <div class="study-section">
+          <h2 class="study-section-header">
+            <button class="study-toggle" data-target="study-advanced-1">
+              <span class="toggle-icon">▶</span>
+              <span>【応用1】破壊耐性の可視化</span>
+            </button>
+          </h2>
+          <div class="study-section-content collapsed" id="study-advanced-1">
+            <p>
+              QRCrashTestでは、QRコードの各領域をモデル化し、どこが壊れると致命的になりやすいかを可視化しています。
+            </p>
+
+            <div class="diagram-container">
+              <svg viewBox="0 0 300 300" class="heatmap-diagram">
+                <!-- 背景グリッド -->
+                <defs>
+                  <linearGradient id="highRisk" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color:#ff0000;stop-opacity:0.6" />
+                    <stop offset="100%" style="stop-color:#ff6666;stop-opacity:0.4" />
+                  </linearGradient>
+                  <linearGradient id="mediumRisk" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color:#ffaa00;stop-opacity:0.5" />
+                    <stop offset="100%" style="stop-color:#ffcc66;stop-opacity:0.3" />
+                  </linearGradient>
+                  <linearGradient id="lowRisk" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color:#ffff00;stop-opacity:0.4" />
+                    <stop offset="100%" style="stop-color:#ffff99;stop-opacity:0.2" />
+                  </linearGradient>
+                </defs>
+
+                <!-- Data領域（低〜中致命度）- 最初に描画して下に配置 -->
+                <rect x="98" y="98" width="124" height="124" fill="url(#lowRisk)"/>
+
+                <!-- Finder領域（高致命度） -->
+                <rect x="10" y="10" width="70" height="70" fill="url(#highRisk)"/>
+                <rect x="220" y="10" width="70" height="70" fill="url(#highRisk)"/>
+                <rect x="10" y="220" width="70" height="70" fill="url(#highRisk)"/>
+
+                <!-- Timing領域（高致命度）- position 6 → pixel 70 -->
+                <rect x="80" y="66" width="140" height="8" fill="url(#highRisk)"/>
+                <rect x="66" y="80" width="8" height="140" fill="url(#highRisk)"/>
+
+                <!-- Format領域（中致命度）- position 8 → pixel 90 -->
+                <!-- 左上Finderの右側と下側 -->
+                <rect x="90" y="10" width="8" height="80" fill="url(#mediumRisk)"/>
+                <rect x="10" y="90" width="80" height="8" fill="url(#mediumRisk)"/>
+                <!-- 右上Finderの下側 -->
+                <rect x="220" y="90" width="70" height="8" fill="url(#mediumRisk)"/>
+                <!-- 左下Finderの右側 -->
+                <rect x="90" y="220" width="8" height="70" fill="url(#mediumRisk)"/>
+
+                <!-- Finder の枠 -->
+                <rect x="15" y="15" width="60" height="60" fill="none" stroke="#000" stroke-width="3"/>
+                <rect x="225" y="15" width="60" height="60" fill="none" stroke="#000" stroke-width="3"/>
+                <rect x="15" y="225" width="60" height="60" fill="none" stroke="#000" stroke-width="3"/>
+
+                <!-- ラベル -->
+                <text x="45" y="110" font-size="12" font-weight="bold" fill="#c00">高</text>
+                <text x="150" y="155" font-size="12" font-weight="bold" fill="#666">低</text>
+              </svg>
+              <p class="diagram-caption">図4: 致命度ヒートマップ（赤→黄の順に危険度が高い）</p>
+            </div>
+
+            <h4>致命度の違い</h4>
+            <ul>
+              <li><strong style="color: #c00;">Finder・Timing（高致命度）</strong> - これらが破壊されると、わずかなダメージでも読み取り不能に直結します。</li>
+              <li><strong style="color: #f80;">Format情報（中致命度）</strong> - メタ情報の破損により、デコードアルゴリズムが混乱します。</li>
+              <li><strong style="color: #cc0;">Data領域（低〜中致命度）</strong> - 誤り訂正によってある程度の欠損が補われるため、同じ面積でも致命度は相対的に低くなります。</li>
+            </ul>
+            <p>
+              <strong>解析タブ</strong>の「致命度ヒートマップ」を有効にすると、どの領域が「当たりどころが悪い」かを視覚的に確認できます。
+            </p>
+          </div>
+        </div>
+
+        <div class="study-section">
+          <h2 class="study-section-header">
+            <button class="study-toggle" data-target="study-advanced-2">
+              <span class="toggle-icon">▶</span>
+              <span>【応用2】実践的な破壊テスト</span>
+            </button>
+          </h2>
+          <div class="study-section-content collapsed" id="study-advanced-2">
+            <div class="diagram-container">
+              <svg viewBox="0 0 450 200" class="damage-examples-diagram">
+                <!-- 例1: Finder攻撃 -->
+                <g>
+                  <rect x="10" y="10" width="100" height="100" fill="#f0f0f0" stroke="#999" stroke-width="1"/>
+                  <rect x="15" y="15" width="30" height="30" fill="#2196F3"/>
+                  <rect x="75" y="15" width="30" height="30" fill="#2196F3"/>
+                  <rect x="15" y="75" width="30" height="30" fill="#2196F3"/>
+                  <!-- ダメージ -->
+                  <rect x="15" y="15" width="15" height="15" fill="#000" opacity="0.8"/>
+                  <text x="60" y="130" text-anchor="middle" font-size="11" font-weight="bold">Finder攻撃</text>
+                  <text x="60" y="145" text-anchor="middle" font-size="9" fill="#c00">→ FAIL</text>
+                </g>
+
+                <!-- 例2: Data領域汚損 -->
+                <g>
+                  <rect x="130" y="10" width="100" height="100" fill="#f0f0f0" stroke="#999" stroke-width="1"/>
+                  <rect x="135" y="15" width="30" height="30" fill="#2196F3"/>
+                  <rect x="195" y="15" width="30" height="30" fill="#2196F3"/>
+                  <rect x="135" y="75" width="30" height="30" fill="#2196F3"/>
+                  <!-- ダメージ（散発） -->
+                  <circle cx="170" cy="50" r="2" fill="#666"/>
+                  <circle cx="180" cy="55" r="2" fill="#666"/>
+                  <circle cx="175" cy="65" r="2" fill="#666"/>
+                  <circle cx="185" cy="60" r="2" fill="#666"/>
+                  <circle cx="165" cy="70" r="2" fill="#666"/>
+                  <circle cx="190" cy="68" r="2" fill="#666"/>
+                  <text x="180" y="130" text-anchor="middle" font-size="11" font-weight="bold">Data汚損</text>
+                  <text x="180" y="145" text-anchor="middle" font-size="9" fill="#4CAF50">→ SUCCESS</text>
+                </g>
+
+                <!-- 例3: 影 -->
+                <g>
+                  <rect x="250" y="10" width="100" height="100" fill="#f0f0f0" stroke="#999" stroke-width="1"/>
+                  <rect x="255" y="15" width="30" height="30" fill="#2196F3"/>
+                  <rect x="315" y="15" width="30" height="30" fill="#2196F3"/>
+                  <rect x="255" y="75" width="30" height="30" fill="#2196F3"/>
+                  <!-- 影 -->
+                  <ellipse cx="300" cy="60" rx="35" ry="25" fill="#000" opacity="0.3"/>
+                  <text x="300" y="130" text-anchor="middle" font-size="11" font-weight="bold">影・かすれ</text>
+                  <text x="300" y="145" text-anchor="middle" font-size="9" fill="#FF9800">→ 位置次第</text>
+                </g>
+
+                <!-- 凡例 -->
+                <text x="10" y="175" font-size="10" fill="#666">💡 ヒント:</text>
+                <text x="10" y="190" font-size="9" fill="#666">Finder攻撃は少量で致命的、Data汚損は広範囲でも耐性あり、影は位置と範囲が重要</text>
+              </svg>
+              <p class="diagram-caption">図5: 典型的なダメージパターンと読み取り結果の例</p>
+            </div>
+
+            <h4>このツールで確認できること</h4>
+            <ul>
+              <li><strong>Finder付近の脆弱性</strong> - 少し塗りつぶすだけで、読み取り不能になりやすいことを体験できます。</li>
+              <li><strong>Data領域の耐性</strong> - 散発的な汚れがあっても、意外と復元されてしまうことを確認できます。</li>
+              <li><strong>ダメージ形状の影響</strong> - 影やかすれの形状・位置によって、致命度が大きく変わることを観察できます。</li>
+              <li><strong>破損率と読み取り可否</strong> - 「どこをどれくらい壊すと危ないか」を視覚的にイメージできます。</li>
+            </ul>
+            <h4>推奨される実験手順</h4>
+            <ol>
+              <li><strong>プリセット攻撃を試す</strong> - 「攻撃シナリオプリセット」で典型的なダメージパターンを試してみましょう。</li>
+              <li><strong>Finderを攻撃</strong> - 左上のFinder領域を少しずつ塗りつぶし、どの時点で読み取り不可になるか観察します。</li>
+              <li><strong>Data領域を攻撃</strong> - 中央のData領域に汚れを散布し、誤り訂正の限界を探ります。</li>
+              <li><strong>複合攻撃</strong> - Finderへの小ダメージ + Data領域への分散ダメージを組み合わせて閾値を探ります。</li>
+            </ol>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer">
+      🔗 GitHubリポジトリはこちら（ <a href="https://github.com/ipusiron/qrcrashtest" target="_blank">ipusiron/qrcrashtest</a> ）
+    </div>
+  </footer>
+
+  <!-- jsQR ライブラリ -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <!-- QRCode生成ライブラリ -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

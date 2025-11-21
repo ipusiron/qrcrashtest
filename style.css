@@ -1,0 +1,1329 @@
+/**
+ * QRCrashTest - スタイルシート
+ *
+ * QRコード破壊耐性クラッシュテストツール
+ *
+ * 構成:
+ * 1. 基本設定（リセット、フォント、レイアウト）
+ * 2. ヘッダー
+ * 3. タブシステム
+ * 4. クラッシュテストタブ（QR読み込み、キャンバス、ダメージツール）
+ * 5. 解析タブ（構造可視化、レイヤー切り替え）
+ * 6. 座学タブ（アコーディオン、スライダー）
+ * 7. 共通コンポーネント（パネル、ボタン、コントロール）
+ * 8. ローディング表示
+ * 9. レスポンシブ対応
+ */
+
+/* ============================================================
+   基本設定
+   ============================================================ */
+
+/* CSSリセット */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ベーススタイル */
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f5f5f7;
+  color: #222;
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+/* ============================================================
+   ヘッダー
+   ============================================================ */
+
+header {
+  padding: 1.2rem 1.5rem 0.5rem;
+  border-bottom: 1px solid #ddd;
+  background: #ffffff;
+  text-align: center;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 1rem;
+  color: #555;
+}
+
+/* ============================================================
+   メインコンテンツ
+   ============================================================ */
+
+main {
+  padding: 0.8rem 1.5rem 3rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: calc(100vh - 200px);
+}
+
+/* ============================================================
+   タブシステム
+   ============================================================ */
+
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.8rem;
+}
+
+.tab-button {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  background: #f0f0f0;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.tab-button.active {
+  background: #222;
+  color: #fff;
+  border-color: #222;
+}
+
+/* タブコンテンツ表示切り替え */
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: flex;
+  gap: 1rem;
+  flex-direction: column;
+}
+
+/* ============================================================
+   クラッシュテストタブ
+   ============================================================ */
+
+/* QR読み込みセクション（左右2カラムレイアウト） */
+
+.load-section {
+  width: 100%;
+  margin: 0 auto 1.5rem;
+  display: flex;
+  gap: 1.5rem;
+}
+
+.load-section-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.load-section-right {
+  flex: 1;
+  min-width: 0;
+}
+
+.load-drop-zone {
+  padding: 1.5rem;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  background: #fafafa;
+  transition: all 0.3s;
+  text-align: center;
+}
+
+.load-drop-zone.drag-over {
+  border-color: #667eea;
+  background: #f0f4ff;
+  transform: scale(1.02);
+}
+
+.crash-main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.crash-top-row {
+  display: flex;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.crash-qr-area {
+  flex: 1;
+  min-width: 0;
+  max-width: 520px;
+}
+
+.crash-info-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.crash-bottom-row {
+  display: flex;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.crash-tools-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.crash-presets-area {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ============================================================
+   解析タブ - レイアウト
+   ============================================================ */
+
+/* ペインレイアウト（左右2カラム） */
+.pane {
+  flex: 1;
+  min-width: 0;
+}
+
+.pane-left {
+  max-width: 520px;
+}
+
+.pane-right {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-bottom: 2rem;
+}
+
+/* 解析タブは縦並び（説明が上、ペインが下） */
+#tab-analyze.active {
+  flex-direction: column;
+}
+
+/* 解析タブのペイン部分は横並び */
+.analyze-panes {
+  display: flex;
+  flex-direction: row;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+/* ============================================================
+   座学タブ - レイアウト
+   ============================================================ */
+
+#tab-study.active {
+  flex-direction: column;
+}
+
+/* ============================================================
+   キャンバス（共通）
+   ============================================================ */
+
+.canvas-wrapper {
+  position: relative;
+  width: 500px;
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background: #fafafa;
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+
+.canvas-wrapper.drag-over {
+  border-color: #0066cc;
+  border-width: 3px;
+  background: #e6f2ff;
+}
+
+.canvas-wrapper canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+#previewCanvas {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+#damageHeatmapCanvas {
+  pointer-events: none;
+  opacity: 0.4;
+  display: none;
+}
+
+#damageHeatmapCanvas.visible {
+  display: block;
+}
+
+/* カーソルスタイル（ツール別） */
+.canvas-wrapper.cursor-pen { cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="3" fill="black"/></svg>') 8 8, crosshair; }
+.canvas-wrapper.cursor-dust { cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="6" fill="none" stroke="gray" stroke-width="2"/></svg>') 10 10, crosshair; }
+.canvas-wrapper.cursor-shadow { cursor: crosshair; }
+.canvas-wrapper.cursor-mask { cursor: cell; }
+.canvas-wrapper.cursor-noise { cursor: crosshair; }
+
+.no-image-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: repeating-linear-gradient(
+    45deg,
+    #f9f9f9,
+    #f9f9f9 10px,
+    #f1f1f1 10px,
+    #f1f1f1 20px
+  );
+  color: #777;
+  font-size: 1rem;
+  padding: 1rem;
+}
+
+/* ============================================================
+   共通コンポーネント - パネル
+   ============================================================ */
+
+/* 基本パネルスタイル */
+.panel {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  border: 1px solid #e0e0e0;
+}
+
+.panel h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
+}
+
+/* 解析タブの説明エリア（グラデーション背景） */
+.analysis-intro {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1rem 1.2rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  width: 100%;
+}
+
+.analysis-intro h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.analysis-intro p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  opacity: 0.95;
+}
+
+.section-description {
+  background: #f8f9fa;
+  border-left: 3px solid #667eea;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 0.8rem;
+  border-radius: 4px;
+}
+
+.section-description p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: #444;
+}
+
+.section-description strong {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
+}
+
+.toggle-panel {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  color: #666;
+  border-radius: 4px;
+}
+
+.toggle-panel:hover {
+  background: #f0f0f0;
+  color: #222;
+}
+
+.panel-content {
+  overflow: visible;
+  transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.panel-content.collapsed {
+  max-height: 0 !important;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.file-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+/* ============================================================
+   ダメージツール - 現在のツール表示
+   ============================================================ */
+
+.current-tool-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 8px;
+  margin-bottom: 0.6rem;
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+#currentToolIcon {
+  font-size: 1.5rem;
+}
+
+/* ============================================================
+   ダメージツール - ツール選択ボタン
+   ============================================================ */
+.tool-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  font-size: 0.92rem;
+}
+
+.tool-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.6rem 0.5rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  background: #fafafa;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1;
+  min-width: 80px;
+}
+
+.tool-button:hover {
+  background: #f0f0f0;
+  border-color: #999;
+  transform: translateY(-2px);
+}
+
+.tool-button input[type="radio"] {
+  display: none;
+}
+
+.tool-button input[type="radio"]:checked + .tool-icon {
+  transform: scale(1.3);
+}
+
+.tool-button:has(input[type="radio"]:checked) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: #667eea;
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.tool-icon {
+  font-size: 1.5rem;
+  transition: transform 0.2s;
+}
+
+.tool-label {
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.control-row {
+  margin-top: 0.45rem;
+  font-size: 0.92rem;
+}
+
+.control-row input[type="range"] {
+  width: 100%;
+}
+
+.control-row select {
+  margin-left: 0.4rem;
+}
+
+/* ============================================================
+   ツールチップ（？アイコン）
+   ============================================================ */
+
+/* ツールチップアイコン本体 */
+.tooltip-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  background: #667eea;
+  color: white;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: bold;
+  margin-left: 0.3rem;
+  cursor: help;
+  position: relative;
+  vertical-align: middle;
+}
+
+/* ツールチップ吹き出し（ホバー時に表示） */
+.tooltip-icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: normal;
+  white-space: normal;
+  width: 220px;
+  text-align: left;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 1000;
+}
+
+.tooltip-icon::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-2px);
+  border: 6px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.9);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 1000;
+}
+
+.tooltip-icon:hover::after,
+.tooltip-icon:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.button-row {
+  margin-top: 0.6rem;
+}
+
+button {
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  background: #f0f0f0;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+
+button:hover {
+  background: #e4e4e4;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: 0.25rem;
+  font-size: 0.92rem;
+}
+
+.status-grid .label {
+  color: #555;
+}
+
+.url-box {
+  margin-top: 0.6rem;
+}
+
+.decoded-data {
+  margin: 0.2rem 0 0;
+  padding: 0.4rem;
+  background: #f7f7f7;
+  border-radius: 4px;
+  border: 1px solid #e2e2e2;
+  font-size: 0.88rem;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.control-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+  margin-top: 0.25rem;
+}
+
+/* Study */
+
+.study-article {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  border: 1px solid #e0e0e0;
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.study-intro {
+  padding: 0.8rem 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 1.02rem;
+  text-align: center;
+}
+
+.study-section {
+  margin-bottom: 0.8rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.study-section-header {
+  margin: 0;
+}
+
+.study-toggle {
+  width: 100%;
+  background: #f5f5f5;
+  border: none;
+  padding: 0.8rem 1rem;
+  text-align: left;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  transition: background 0.2s;
+  color: #333;
+}
+
+.study-toggle:hover {
+  background: #e8e8e8;
+}
+
+.toggle-icon {
+  font-size: 0.8rem;
+  transition: transform 0.3s;
+  display: inline-block;
+}
+
+.study-toggle.active .toggle-icon {
+  transform: rotate(90deg);
+}
+
+.study-section-content {
+  padding: 1rem 1.2rem;
+  background: #ffffff;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+}
+
+.study-section-content.collapsed {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.study-section-content:not(.collapsed) {
+  max-height: 2000px;
+}
+
+.study-article h2 {
+  margin-top: 0;
+}
+
+.study-article h3 {
+  margin-top: 1rem;
+  font-size: 1.15rem;
+  color: #555;
+}
+
+.study-article h4 {
+  margin-top: 0.8rem;
+  margin-bottom: 0.4rem;
+  font-size: 1.05rem;
+  color: #667eea;
+}
+
+.study-article p {
+  line-height: 1.7;
+  font-size: 1rem;
+  margin: 0.5rem 0;
+}
+
+.study-article ul {
+  padding-left: 1.3rem;
+  font-size: 0.98rem;
+  line-height: 1.6;
+  margin: 0.5rem 0;
+}
+
+.study-article ol {
+  padding-left: 1.3rem;
+  font-size: 0.98rem;
+  line-height: 1.6;
+  margin: 0.5rem 0;
+}
+
+.study-article li {
+  margin-bottom: 0.4rem;
+}
+
+.study-article .note {
+  font-size: 0.92rem;
+  color: #666;
+  font-style: italic;
+  padding: 0.5rem;
+  background: #f9f9f9;
+  border-left: 3px solid #999;
+  margin: 0.5rem 0;
+}
+
+/* 図解 */
+.diagram-container {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  text-align: center;
+}
+
+.diagram-container svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.diagram-caption {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: #666;
+  font-style: italic;
+  text-align: center;
+}
+
+/* QRコード実例 */
+.qr-example-wrapper {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  margin-top: 1rem;
+}
+
+.qr-example-main {
+  position: relative;
+  flex: 1;
+  max-width: 300px;
+}
+
+.qr-sample-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 4px;
+}
+
+.qr-annotation-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.qr-example-legend {
+  flex: 1;
+  text-align: left;
+}
+
+.qr-example-legend h5 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: #333;
+}
+
+.legend-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+
+.legend-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.legend-color {
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  border-radius: 3px;
+  border: 1px solid #ddd;
+  flex-shrink: 0;
+}
+
+.legend-note {
+  margin-top: 0.8rem;
+  padding: 0.5rem;
+  background: #fff3cd;
+  border-left: 3px solid #ffc107;
+  font-size: 0.9rem;
+  color: #856404;
+  border-radius: 3px;
+}
+
+/* 色分けQRコード */
+.qr-diagram-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.qr-diagram-display {
+  position: relative;
+  max-width: 350px;
+  width: 100%;
+}
+
+.qr-colored-diagram {
+  width: 100%;
+  height: auto;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  display: block;
+}
+
+.qr-highlight-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.qr-highlight-overlay.visible {
+  opacity: 1;
+}
+
+.qr-url-display {
+  font-size: 0.9rem;
+  color: #667eea;
+  background: #f0f0f0;
+  padding: 0.5rem 0.8rem;
+  border-radius: 4px;
+  word-break: break-all;
+  margin: 0;
+  text-align: center;
+}
+
+.qr-coordinate-display {
+  font-size: 0.92rem;
+  color: #555;
+  background: #fafafa;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  margin: 0.3rem 0 0 0;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+}
+
+/* 構成要素リスト */
+.component-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.component-list li {
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.5rem;
+  background: #fafafa;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1.6;
+}
+
+.component-list li:hover {
+  background: #fff;
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+  transform: translateX(5px);
+}
+
+.component-list li[data-component="finder"]:hover {
+  border-color: #2196F3;
+}
+
+.component-list li[data-component="timing"]:hover {
+  border-color: #4CAF50;
+}
+
+.component-list li[data-component="format"]:hover {
+  border-color: #9C27B0;
+}
+
+.component-list li[data-component="data"]:hover {
+  border-color: #FF9800;
+}
+
+/* ============================================================
+   レスポンシブ対応
+   ============================================================ */
+
+/* タブレット以下（768px以下） */
+@media (max-width: 768px) {
+  /* Crash Test タブのモバイルレイアウト */
+  .load-section {
+    flex-direction: column;
+  }
+
+  .crash-top-row {
+    flex-direction: column;
+  }
+
+  .crash-qr-area {
+    max-width: 100%;
+  }
+
+  .crash-bottom-row {
+    flex-direction: column;
+  }
+
+  .qr-example-wrapper {
+    flex-direction: column;
+  }
+
+  .qr-example-main {
+    max-width: 100%;
+  }
+
+  .qr-colored-example {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .qr-colored-diagram {
+    max-width: 250px;
+  }
+
+  .qr-colored-legend {
+    max-width: 100%;
+  }
+
+  /* 解析タブのモバイル対応 */
+  .analysis-intro {
+    padding: 0.8rem 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .analysis-intro h3 {
+    font-size: 1.05rem;
+  }
+
+  .analysis-intro p {
+    font-size: 0.9rem;
+  }
+
+  .analyze-panes {
+    flex-direction: column;
+  }
+
+  .section-description {
+    padding: 0.6rem 0.8rem;
+  }
+
+  .section-description p {
+    font-size: 0.88rem;
+  }
+}
+
+/* Analysis */
+
+.analysis-wrapper {
+  background: #ffffff;
+  margin-bottom: 2rem;
+}
+
+.analyze-button {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.analyze-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+}
+
+.analyze-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.analyze-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Footer */
+
+footer {
+  margin-top: 2rem;
+  border-top: 1px solid #ddd;
+  padding: 0.8rem 1.5rem 1.2rem;
+  background: #fafafa;
+  text-align: center;
+  clear: both;
+}
+
+.footer {
+  font-size: 0.92rem;
+  color: #555;
+}
+
+.footer a {
+  color: #0066cc;
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive */
+
+@media (max-width: 960px) {
+  main {
+    padding: 0.8rem 0.8rem 1.2rem;
+  }
+
+  .tab-content.active {
+    flex-direction: column;
+  }
+
+  .pane-left {
+    max-width: 100%;
+  }
+
+  .canvas-wrapper {
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .tabs {
+    flex-wrap: wrap;
+  }
+
+  .tab-button {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  /* モバイル最適化：タッチ操作向けにボタンサイズ拡大 */
+  .tool-button {
+    min-width: 70px;
+    padding: 0.8rem 0.6rem;
+  }
+
+  .preset-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .preset-button {
+    font-size: 0.95rem;
+    padding: 0.7rem 1rem;
+    width: 100%;
+  }
+
+  button {
+    padding: 0.6rem 1rem;
+    font-size: 0.95rem;
+  }
+}
+
+/* ステータスバッジ */
+.status-badge-container {
+  margin-bottom: 0.8rem;
+  display: flex;
+  justify-content: center;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-weight: bold;
+  font-size: 0.9rem;
+  transition: all 0.3s;
+  text-align: center;
+  min-width: 120px;
+}
+
+.status-badge.status-idle {
+  background: #e0e0e0;
+  color: #666;
+}
+
+.status-badge.status-success {
+  background: #4caf50;
+  color: white;
+  animation: pulse-success 0.5s ease-out;
+}
+
+.status-badge.status-fail {
+  background: #f44336;
+  color: white;
+  animation: pulse-fail 0.5s ease-out;
+}
+
+@keyframes pulse-success {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+}
+
+@keyframes pulse-fail {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(244, 67, 54, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
+}
+
+/* プリセットボタン */
+.preset-item {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.8rem;
+  margin-bottom: 0.8rem;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.preset-item:last-child {
+  margin-bottom: 0;
+}
+
+.preset-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.preset-info strong {
+  display: block;
+  font-size: 1rem;
+  margin-bottom: 0.3rem;
+  color: #333;
+}
+
+.preset-desc {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #666;
+}
+
+.preset-button {
+  flex-shrink: 0;
+  padding: 0.6rem 1.2rem;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.preset-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
+}
+
+.preset-button:active {
+  transform: translateY(0);
+}
+
+/* サンプルQR選択 */
+.sample-qr-section {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.sample-qr-section select {
+  width: 100%;
+  padding: 0.4rem;
+  margin-top: 0.3rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 0.92rem;
+}
+
+/* QR詳細情報 */
+.qr-details {
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.qr-details h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.98rem;
+  color: #555;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+/* ============================================================
+   ローディング表示
+   ============================================================ */
+
+/* ローディングオーバーレイ（全画面） */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 1.5rem;
+  z-index: 9999;
+  color: white;
+  backdrop-filter: blur(2px);
+}
+
+/* 表示状態（最小200ms保証） */
+.loading-overlay.visible {
+  display: flex;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.loading-overlay p {
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* スピナーアニメーション */
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  border: 6px solid rgba(255, 255, 255, 0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
