@@ -1,11 +1,37 @@
 <!--
 ---
-title: QRCrashTest
-category: qr, visualization, security, educational
-difficulty: 2
-description: "Interactive crash-test lab for QR codes — simulate shadows, occlusion, dirt, and damage to visualize how QR structure and error correction affect scan survivability."
-tags: [qr, qr-code, image, visualization, error-correction, education, javascript]
-demo: https://ipusiron.github.io/qrcrashtest/
+id: day102
+slug: qrcrashtest
+
+title: "QRCrashTest"
+
+subtitle_ja: "QRコード耐性テストツール"
+subtitle_en: "QR code crash-test visualization tool"
+
+description_ja: "影・汚れ・欠損などのダメージに対するQRコードの読み取り耐性を体験できる実験ツール。構造レイヤーと致命ゾーンの可視化により、誤り訂正と“当たりどころ”の違いを直感的に学べる。"
+description_en: "Interactive crash-test lab for QR codes — simulate shadows, occlusion, dirt, and damage to visualize how QR structure and error correction affect scan survivability."
+
+category:
+  - qr
+  - visualization
+  - security
+  - educational
+
+difficulty: 3
+
+tags:
+  - qr
+  - qr-code
+  - visualization
+  - image
+  - error-correction
+  - education
+  - javascript
+
+repo_url: "https://github.com/ipusiron/qrcrashtest"
+demo_url: "https://ipusiron.github.io/qrcrashtest/"
+
+hub: true
 ---
 !-->
 
