@@ -8,7 +8,7 @@ title: "QRCrashTest"
 subtitle_ja: "QRコード耐性テストツール"
 subtitle_en: "QR code crash-test visualization tool"
 
-description_ja: "影・汚れ・欠損などのダメージに対するQRコードの読み取り耐性を体験できる実験ツール。構造レイヤーと致命ゾーンの可視化により、誤り訂正と“当たりどころ”の違いを直感的に学べる。"
+description_ja: "影・汚れ・欠損などのダメージに対するQRコードの読み取り耐性を体験できる実験ツール。構造レイヤーと致命ゾーンの可視化により、誤り訂正と当たりどころの違いを直感的に学べる。"
 description_en: "Interactive crash-test lab for QR codes — simulate shadows, occlusion, dirt, and damage to visualize how QR structure and error correction affect scan survivability."
 
 category_ja:
