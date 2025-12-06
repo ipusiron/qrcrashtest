@@ -252,7 +252,7 @@ QRCrashTestの実験結果を読み解くための **座学タブ** です。
 
 ## 🔄 他のQR関連ツールとの違い
 
-QRCrashTestは「生成AIデツクルセキュリティツール100/200」プロジェクト内の他のQR関連ツールと役割が異なります。
+QRCrashTestは「生成AIで作るセキュリティツール100/200」プロジェクト内の他のQR関連ツールと役割が異なります。
 
 ### ImageDiffSecとの違い
 
@@ -298,6 +298,7 @@ qrcrashtest/
 ├── script.js           # JavaScriptコード（1,600行以上）
 ├── style.css           # スタイルシート（1,300行以上）
 ├── README.md           # 本ドキュメント
+├── CLAUDE.md           # Claude Code開発ガイド
 ├── LICENSE             # ライセンスファイル
 ├── .nojekyll           # GitHub Pages用設定
 ├── .gitignore          # Git除外設定
