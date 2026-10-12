@@ -77,9 +77,15 @@ main {
   display: flex;
   gap: 0.4rem;
   margin-bottom: 0.8rem;
+  overflow-x: auto;
+  padding: 0.15rem 0.15rem 0.4rem;
+  scroll-padding-inline: 0.15rem;
+  scrollbar-width: thin;
 }
 
 .tab-button {
+  flex: 0 0 auto;
+  min-height: 44px;
   padding: 0.5rem 1rem;
   border-radius: 999px;
   border: 1px solid #ccc;
@@ -1102,12 +1108,36 @@ footer {
 
 @media (max-width: 600px) {
   .tabs {
-    flex-wrap: wrap;
+    width: 100%;
+    min-width: 0;
+    contain: inline-size;
   }
 
   .tab-button {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     text-align: center;
+  }
+
+  input[type="file"],
+  select {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .control-row {
+    flex-wrap: wrap;
+  }
+
+  .tooltip-icon::after {
+    right: -0.25rem;
+    left: auto;
+    max-width: calc(100vw - 3rem);
+    transform: translateY(-8px);
+  }
+
+  .tooltip-icon:hover::after {
+    transform: translateY(0);
   }
 
   /* モバイル最適化：タッチ操作向けにボタンサイズ拡大 */

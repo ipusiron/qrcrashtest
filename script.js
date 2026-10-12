@@ -30,10 +30,20 @@
   buttons.forEach((btn) => {
     btn.addEventListener("click", () => {
       const target = btn.dataset.tab;
-      buttons.forEach((b) => b.classList.remove("active"));
-      contents.forEach((c) => c.classList.remove("active"));
+      buttons.forEach((b) => {
+        b.classList.remove("active");
+        b.setAttribute("aria-selected", "false");
+      });
+      contents.forEach((c) => {
+        c.classList.remove("active");
+        c.hidden = true;
+      });
       btn.classList.add("active");
-      document.getElementById(target).classList.add("active");
+      btn.setAttribute("aria-selected", "true");
+      const targetPanel = document.getElementById(target);
+      targetPanel.classList.add("active");
+      targetPanel.hidden = false;
+      btn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
 
       // 分析タブに切り替えた時、QRコード画像が読み込まれていればQRコードを表示
       if (target === "tab-analyze" && qrImageLoaded && originalImage) {
@@ -44,6 +54,20 @@
           // 未解析の場合はQRコード画像のみ表示
           drawQRImageOnly();
         }
+      }
+    });
+
+    btn.addEventListener("keydown", (event) => {
+      const currentIndex = Array.from(buttons).indexOf(btn);
+      let nextIndex = currentIndex;
+      if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % buttons.length;
+      if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+      if (event.key === "Home") nextIndex = 0;
+      if (event.key === "End") nextIndex = buttons.length - 1;
+      if (nextIndex !== currentIndex) {
+        event.preventDefault();
+        buttons[nextIndex].focus();
+        buttons[nextIndex].click();
       }
     });
   });
@@ -281,7 +305,6 @@ function updateQrDetails(result, img) {
 
   // 推定モジュール数（location.topRightFinderPatternから推測）
   if (result.location) {
-    const horizontalDistance = Math.abs(result.location.topRightFinderPattern.x - result.location.topLeftFinderPattern.x);
     const version = result.version || 1;
     const moduleCount = 17 + 4 * version;
     moduleCountEl.textContent = moduleCount > 0 ? `約 ${moduleCount}` : "不明";
@@ -413,8 +436,8 @@ function loadQRImage(file) {
 
   showLoading();
 
-  // FileReaderは同期的にブロックするため、setTimeoutで次のイベントループに遅延
-  // これによりローディング表示が確実にレンダリングされる
+  // FileReader自体は非同期。先にローディング表示を描画するため、読み込み開始を
+  // 次のイベントループへ送る。
   setTimeout(() => {
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -730,64 +753,12 @@ clearOverlayButton.addEventListener("click", () => {
  */
 function estimateModuleSize(location, version) {
   if (!location) return 10; // デフォルト
-
-  const moduleCount = 17 + 4 * version; // QRコードのモジュール数
-  const topLeft = location.topLeftFinderPattern;
-  const topRight = location.topRightFinderPattern;
-
-  // 横方向の距離からモジュールサイズを推定
-  const distance = Math.sqrt(
-    Math.pow(topRight.x - topLeft.x, 2) + Math.pow(topRight.y - topLeft.y, 2)
-  );
-
-  return distance / (moduleCount - 7); // Finder分を除く
+  return QRCore.calculateQRModuleMetrics(location, version).moduleSize;
 }
 
 // Alignmentパターンの位置を取得（QR仕様に基づく）
 function getAlignmentPatternPositions(version) {
-  // バージョン1はAlignmentなし
-  if (version < 2) return [];
-
-  // バージョンごとのAlignment座標（QR仕様による）
-  const alignmentPatternTable = {
-    2: [6, 18],
-    3: [6, 22],
-    4: [6, 26],
-    5: [6, 30],
-    6: [6, 34],
-    7: [6, 22, 38],
-    8: [6, 24, 42],
-    9: [6, 26, 46],
-    10: [6, 28, 50],
-    11: [6, 30, 54],
-    12: [6, 32, 58],
-    13: [6, 34, 62],
-    14: [6, 26, 46, 66]
-  };
-
-  const positions = alignmentPatternTable[version] || alignmentPatternTable[7]; // デフォルトはバージョン7
-  const result = [];
-
-  // グリッドパターンを生成（Finderと重ならない位置のみ）
-  for (let i = 0; i < positions.length; i++) {
-    for (let j = 0; j < positions.length; j++) {
-      const row = positions[i];
-      const col = positions[j];
-
-      // Finderパターンと重なる位置を除外
-      // 左上 (0-8, 0-8)、右上 (n-8, 0-8)、左下 (0-8, n-8)
-      const moduleCount = 17 + 4 * version;
-      const isTopLeft = (row <= 8 && col <= 8);
-      const isTopRight = (row <= 8 && col >= moduleCount - 9);
-      const isBottomLeft = (row >= moduleCount - 9 && col <= 8);
-
-      if (!isTopLeft && !isTopRight && !isBottomLeft) {
-        result.push([row, col]);
-      }
-    }
-  }
-
-  return result;
+  return QRCore.getAlignmentPatternPositions(version);
 }
 
 // QRコード画像のみを描画（領域オーバーレイなし）
@@ -857,29 +828,12 @@ function calculateQRCanvasTransform() {
 
 // モジュール数とサイズを計算
 function calculateQRModuleMetrics(location, version) {
-  const topLeft = location.topLeftFinderPattern;
-  const topRight = location.topRightFinderPattern;
-  const bottomLeft = location.bottomLeftFinderPattern;
-
-  const moduleCount = 17 + 4 * version;
-  const horizontalDistance = Math.abs(topRight.x - topLeft.x);
-  const moduleSize = horizontalDistance / (moduleCount - 7);
-  const finderModuleSize = 7 * moduleSize;
-
-  return {
-    topLeft,
-    topRight,
-    bottomLeft,
-    moduleCount,
-    horizontalDistance,
-    moduleSize,
-    finderModuleSize
-  };
+  return QRCore.calculateQRModuleMetrics(location, version);
 }
 
 // QRコード構造領域を定義
 function defineQRStructureRegions(metrics) {
-  const { topLeft, topRight, bottomLeft, horizontalDistance, moduleSize, finderModuleSize } = metrics;
+  const { topLeft, topRight, bottomLeft, horizontalDistance, verticalDistance, moduleSize, finderModuleSize } = metrics;
 
   const regions = {
     finder: [
@@ -898,7 +852,7 @@ function defineQRStructureRegions(metrics) {
         x: topLeft.x - moduleSize / 2,
         y: topLeft.y + finderModuleSize / 2,
         w: moduleSize,
-        h: Math.abs(bottomLeft.y - topLeft.y) - finderModuleSize
+        h: verticalDistance - finderModuleSize
       }
     ],
     format: [
@@ -913,7 +867,7 @@ function defineQRStructureRegions(metrics) {
     x: topLeft.x + finderModuleSize * 0.6,
     y: topLeft.y + finderModuleSize * 0.6,
     w: horizontalDistance - finderModuleSize * 1.2,
-    h: Math.abs(bottomLeft.y - topLeft.y) - finderModuleSize * 1.2
+    h: verticalDistance - finderModuleSize * 1.2
   };
 
   return { regions, dataRegion };
@@ -1078,11 +1032,9 @@ function drawStructureLayers(regions, dataRegion, metrics, version) {
       analysisCtx.fillStyle = "rgba(233, 30, 99, 0.3)";
       analysisCtx.lineWidth = 2;
 
-      const { topLeft, moduleSize } = metrics;
-
       alignmentPositions.forEach(([row, col]) => {
-        const x = topLeft.x + (col - 3.5) * moduleSize;
-        const y = topLeft.y + (row - 3.5) * moduleSize;
+        const { x, y } = QRCore.mapModulePoint(metrics, row, col);
+        const { moduleSize } = metrics;
         const radius = moduleSize * 2.5;
 
         analysisCtx.beginPath();
@@ -1281,9 +1233,8 @@ showDamageHeatmap.addEventListener("change", () => {
 // ===== サンプルQRコード選択 =====
 
 const sampleQRs = {
-  sample1: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://github.com/ipusiron/qrcrashtest",
-  sample2: "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=QRCrashTest%20is%20an%20interactive%20tool%20for%20testing%20QR%20code%20resilience%20against%20physical%20damage",
-  sample3: "https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=Lorem%20ipsum%20dolor%20sit%20amet%2C%20consectetur%20adipiscing%20elit.%20Sed%20do%20eiusmod%20tempor%20incididunt%20ut%20labore%20et%20dolore%20magna%20aliqua"
+  sample1: "assets/samples/qr1.png",
+  sample2: "assets/samples/qr2.png"
 };
 
 sampleQrSelect.addEventListener("change", () => {
@@ -1295,7 +1246,6 @@ sampleQrSelect.addEventListener("change", () => {
   // 次のイベントループに遅延して、ローディング表示を確実にレンダリング
   setTimeout(() => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
     img.onload = () => {
       originalImage = img;
       qrImageLoaded = true;
@@ -1350,13 +1300,9 @@ function applyPreset(presetName) {
     // jsQRから実際の位置情報を取得
     const location = qrDecodeResult.location;
     const topLeft = location.topLeftFinderPattern;
-    const topRight = location.topRightFinderPattern;
-    const bottomLeft = location.bottomLeftFinderPattern;
-
     const version = qrDecodeResult.version || 1;
-    const moduleCount = 17 + 4 * version;
-    const horizontalDistance = Math.abs(topRight.x - topLeft.x);
-    const moduleSize = horizontalDistance / (moduleCount - 7);
+    const metrics = QRCore.calculateQRModuleMetrics(location, version);
+    const moduleSize = metrics.moduleSize;
     finderSize = 7 * moduleSize;
 
     finderPositions = [
@@ -1411,12 +1357,11 @@ function applyPreset(presetName) {
       if (qrDecodeResult && qrDecodeResult.location) {
         const location = qrDecodeResult.location;
         const topLeft = location.topLeftFinderPattern;
-        const topRight = location.topRightFinderPattern;
-        const bottomLeft = location.bottomLeftFinderPattern;
         const version = qrDecodeResult.version || 1;
-        const moduleCount = 17 + 4 * version;
-        const horizontalDistance = Math.abs(topRight.x - topLeft.x);
-        const moduleSize = horizontalDistance / (moduleCount - 7);
+        const metrics = QRCore.calculateQRModuleMetrics(location, version);
+        const horizontalDistance = metrics.horizontalDistance;
+        const verticalDistance = metrics.verticalDistance;
+        const moduleSize = metrics.moduleSize;
         const finderModuleSize = 7 * moduleSize;
 
         // 横または縦をランダムに選択
@@ -1427,8 +1372,8 @@ function applyPreset(presetName) {
           overlayCtx.fillRect(startX, topLeft.y - moduleSize / 2 - 5, width, moduleSize + 10);
         } else {
           // 縦のTiming
-          const startY = topLeft.y + finderModuleSize / 2 + Math.random() * (Math.abs(bottomLeft.y - topLeft.y) - finderModuleSize) * 0.5;
-          const height = (Math.abs(bottomLeft.y - topLeft.y) - finderModuleSize) * (0.2 + Math.random() * 0.3);
+          const startY = topLeft.y + finderModuleSize / 2 + Math.random() * (verticalDistance - finderModuleSize) * 0.5;
+          const height = (verticalDistance - finderModuleSize) * (0.2 + Math.random() * 0.3);
           overlayCtx.fillRect(topLeft.x - moduleSize / 2 - 5, startY, moduleSize + 10, height);
         }
       } else {
