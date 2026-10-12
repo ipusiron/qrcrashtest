@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <title>QRCrashTest - QRコード破壊耐性クラッシュテスト</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,14 +21,14 @@
       <p>読み込み中...</p>
     </div>
 
-    <div class="tabs">
-      <button class="tab-button active" data-tab="tab-crash">クラッシュテスト</button>
-      <button class="tab-button" data-tab="tab-analyze">解析</button>
-      <button class="tab-button" data-tab="tab-study">座学</button>
+    <div class="tabs" role="tablist" aria-label="機能">
+      <button class="tab-button active" id="tab-button-crash" type="button" role="tab" aria-selected="true" aria-controls="tab-crash" data-tab="tab-crash">クラッシュテスト</button>
+      <button class="tab-button" id="tab-button-analyze" type="button" role="tab" aria-selected="false" aria-controls="tab-analyze" data-tab="tab-analyze">解析</button>
+      <button class="tab-button" id="tab-button-study" type="button" role="tab" aria-selected="false" aria-controls="tab-study" data-tab="tab-study">座学</button>
     </div>
 
     <!-- タブ1: Crash Test -->
-    <section id="tab-crash" class="tab-content active">
+    <section id="tab-crash" class="tab-content active" role="tabpanel" aria-labelledby="tab-button-crash">
       <!-- 読み込みセクション -->
       <div class="load-section">
         <div class="load-section-left">
@@ -46,9 +48,8 @@
                 <strong>サンプルQRコード：</strong>
                 <select id="sampleQrSelect">
                   <option value="">選択してください</option>
-                  <option value="sample1">サンプル1 (Version 1, URL)</option>
-                  <option value="sample2">サンプル2 (Version 5, 長文)</option>
-                  <option value="sample3">サンプル3 (Version 10, 大容量)</option>
+                  <option value="sample1">サンプル1（URL）</option>
+                  <option value="sample2">サンプル2（URL）</option>
                 </select>
               </label>
             </div>
@@ -266,7 +267,7 @@
     </section>
 
     <!-- タブ2: Analyze -->
-    <section id="tab-analyze" class="tab-content">
+    <section id="tab-analyze" class="tab-content" role="tabpanel" aria-labelledby="tab-button-analyze" hidden>
       <!-- 解析タブの説明 -->
       <div class="analysis-intro">
         <h3>📊 このタブでできること</h3>
@@ -292,7 +293,7 @@
           <div class="section-description">
             <p>
               <strong>使い方：</strong>Crash TestタブでQRコードを読み込み後、下のボタンを押してください。<br>
-              jsQRライブラリでQRコードの位置情報を検出し、各構造領域を正確に計算して表示します。
+              jsQRライブラリでQRコードの位置情報を検出し、各構造領域の教育用近似を重ねて表示します。
             </p>
           </div>
           <button id="analyzeButton" class="analyze-button" disabled>
@@ -368,7 +369,7 @@
     </section>
 
     <!-- タブ3: Study -->
-    <section id="tab-study" class="tab-content">
+    <section id="tab-study" class="tab-content" role="tabpanel" aria-labelledby="tab-button-study" hidden>
       <article class="study-article">
         <div class="study-intro">
           <p>QRコードの構造と破壊耐性について、基礎から応用まで段階的に学習できます。</p>
@@ -407,15 +408,15 @@
             <ul class="component-list">
               <li data-component="finder"><strong style="color: #2196F3;">位置検出パターン（Finder）</strong> - 三隅にある大きな四角型のパターン。QRコードの位置と向きを特定します。</li>
               <li data-component="timing"><strong style="color: #4CAF50;">タイミングパターン（Timing）</strong> - 縦横の細いシマ模様。モジュールの座標を決定します。</li>
-              <li data-component="format"><strong style="color: #9C27B0;">Format情報</strong> - バージョンや誤り訂正レベルなどのメタ情報を格納します。</li>
-              <li data-component="data"><strong style="color: #FF9800;">Data + ECC領域</strong> - 実際のデータ（URL、テキストなど）を表す<strong>データコードワード</strong>と、破損を復元するための<strong>誤り訂正コードワード（ECC）</strong>が交互に配置されています。</li>
+              <li data-component="format"><strong style="color: #9C27B0;">Format情報</strong> - 誤り訂正レベルとマスクパターンを格納します。バージョン7以上のバージョン情報は別領域です。</li>
+              <li data-component="data"><strong style="color: #FF9800;">Data + ECC領域</strong> - 実際のデータを表す<strong>データコードワード</strong>と、復元に使う<strong>誤り訂正コードワード（ECC）</strong>が規格所定の順序で配置されます。</li>
             </ul>
             <p>
               これらの領域は、それぞれ異なる重要度を持ちます。特にFinderやTimingは「構造を支えるパーツ」として、
               わずかな破損でも致命的な影響を与える可能性があります。
             </p>
             <p class="note">
-              💡 <strong>注記：</strong> Data + ECC領域では、実際のデータと誤り訂正コードが複雑にインターリーブ（交互配置）されているため、
+              💡 <strong>注記：</strong> Data + ECC領域では、コードワードが複数ブロックに分割・インターリーブされて規格所定の順序で配置されるため、
               本ツールではこれらを一つの「Data + ECC領域」として簡略化して表示しています。厳密な配置は、QRコードのバージョン（サイズ）と誤り訂正レベルによって異なります（詳しくは<strong>基礎2</strong>を参照してください）。
             </p>
           </div>
@@ -430,7 +431,7 @@
           </h2>
           <div class="study-section-content collapsed" id="study-basics-2">
             <p>
-              基礎1で、<strong style="color: #FF9800;">Data + ECC領域</strong>には「データコードワード」と「誤り訂正コードワード（ECC）」が交互配置されていることを学びました。
+              基礎1で、<strong style="color: #FF9800;">Data + ECC領域</strong>には「データコードワード」と「誤り訂正コードワード（ECC）」が配置されていることを学びました。
               この誤り訂正の仕組みこそが、QRコードが一部破損しても読み取れる理由です。
             </p>
             <p>
@@ -493,7 +494,7 @@
               <li><strong>Level H（High）</strong> - 約30%の復元能力。もっとも高い耐性を持ちますが、データ量は少なくなります。</li>
             </ul>
             <p>
-              <strong>トレードオフ：</strong>高いECCレベルほど多くの欠損に耐えられますが、その分、格納できるデータ量は減少します。
+              <strong>トレードオフ：</strong>高いECCレベルほど多くのコードワード誤りを訂正できますが、その分、格納できるデータ量は減少します。「約7〜30%」は画像面積の破損率を保証する値ではありません。
             </p>
 
             <h4>Data + ECC領域の内部構成とインターリーブ</h4>
@@ -506,8 +507,8 @@
               <li><strong>誤り訂正コードワード（ECC）</strong> - データが破損した際に復元するための冗長情報（上記のリードソロモン符号）</li>
             </ul>
             <p>
-              これら2つは単純に「前半がデータ、後半がECC」という並びではなく、QRコード全体に<strong>インターリーブ（交互配置）</strong>されています。
-              つまり、データとECCが細かく入り混じって配置されているため、ある特定の場所が破損しても、周辺のECC情報から復元できる可能性が高まります。
+              複数ブロックがある場合、同じ種類のコードワード同士をブロック間で<strong>インターリーブ</strong>してから、データコードワード群、誤り訂正コードワード群の順に並べます。
+              この分散とリード・ソロモン誤り訂正により、局所的な破損でも復元できる場合があります。ただし、復元可否は破損面積だけでは決まりません。
             </p>
             <p>
               このインターリーブパターンは、<strong>QRコードのバージョン（サイズ／モジュール数）</strong>と<strong>上記の誤り訂正レベル（L/M/Q/H）</strong>の組み合わせによって決定されます。
@@ -790,7 +791,7 @@
               <li><strong>Finder付近の脆弱性</strong> - 少し塗りつぶすだけで、読み取り不能になりやすいことを体験できます。</li>
               <li><strong>Data領域の耐性</strong> - 散発的な汚れがあっても、意外と復元されてしまうことを確認できます。</li>
               <li><strong>ダメージ形状の影響</strong> - 影やかすれの形状・位置によって、致命度が大きく変わることを観察できます。</li>
-              <li><strong>破損率と読み取り可否</strong> - 「どこをどれくらい壊すと危ないか」を視覚的にイメージできます。</li>
+              <li><strong>破損率と読み取り可否</strong> - この画像とjsQRの組み合わせで、破損位置による結果の違いを観察できます。</li>
             </ul>
             <h4>推奨される実験手順</h4>
             <ol>
@@ -807,14 +808,15 @@
 
   <footer>
     <div class="footer">
-      🔗 GitHubリポジトリはこちら（ <a href="https://github.com/ipusiron/qrcrashtest" target="_blank">ipusiron/qrcrashtest</a> ）
+      🔗 GitHubリポジトリはこちら（ <a href="https://github.com/ipusiron/qrcrashtest" target="_blank" rel="noopener noreferrer">ipusiron/qrcrashtest</a> ）
     </div>
   </footer>
 
   <!-- jsQR ライブラリ -->
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" integrity="sha384-b5Ya4Bq3qCyz39m2ISh+4DxjAIljdeFwK/BsXLuj9gugaNwAcj/ia15fxNZL9Nlx" crossorigin="anonymous"></script>
   <!-- QRCode生成ライブラリ -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js" integrity="sha384-lQXOAyZwHXE55JFyrOMB7nY2Wv+m5ZWNtJcHrd1rceRQXAYNLak8ukN5TjBTcIwz" crossorigin="anonymous"></script>
+  <script src="qr-core.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
