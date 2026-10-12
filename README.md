@@ -41,6 +41,8 @@ hub: true
 
 # QRCrashTest – QRコード耐性テストツール
 
+日本語 | [English](README.en.md)
+
 ![GitHub Repo stars](https://img.shields.io/github/stars/ipusiron/qrcrashtest?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/ipusiron/qrcrashtest?style=social)
 ![GitHub last commit](https://img.shields.io/github/last-commit/ipusiron/qrcrashtest)
@@ -79,9 +81,10 @@ hub: true
 
 ## 🎯 想定ユースケース
 
-- セキュリティ講義・ワークショップでの **「QRコードの構造と誤り訂正」体験デモ**
-- 印刷物・ステッカー・掲示物としてのQRコードの **物理的な弱点の可視化**
-- 「影がかかっても読める？」といった **現場感覚の検証用サンドボックス**
+- シード `day102` のFinder破壊を繰り返し、**同じ損傷を再現して説明する講義デモ**
+- ぼかし `2px`、コントラスト `80%`、回転 `5°` のように条件を一つずつ変える **比較実験**
+- Finder攻撃とData汚損を同じシードで比べる **「当たりどころ」の観察**
+- 印刷物・ステッカー・掲示物を想定した、影・遮蔽・画質低下の **教育用サンドボックス**
 
 ---
 
@@ -98,8 +101,13 @@ hub: true
   - ステッカー（白／黒マスク）
   - ノイズバースト
 - **攻撃シナリオプリセット**
-  - Finder破壊、Data破壊、全方位攻撃、散発汚れの4種類
-  - ワンクリックで特定領域にランダムダメージを追加
+  - Finder破壊、Timing攻撃、Data汚損、全体劣化、角ステッカーの5種類
+  - 構造攻撃・分散した欠損・局所的な遮蔽の3カテゴリー
+  - シード指定による同一ダメージの再現
+- **画像劣化条件**
+  - ぼかし、コントラスト、回転を、描画ダメージと組み合わせて評価
+- **日本語／英語表示**
+  - 切り替え時も読み込んだ画像、描画、選択中のタブを維持
 - ダメージを加えた状態での **リアルタイム読み取りテスト**
   - SUCCESS / FAIL の判定
   - 復号データの表示
@@ -139,9 +147,13 @@ QRコードを読み込み、キャンバス上で破壊していく **実験用
   - **「ダメージをリセット」ボタン**
   - **攻撃シナリオプリセット**
     - Finder破壊（位置検出パターンを狙う）
-    - Data破壊（データ領域を狙う）
-    - 全方位攻撃（広範囲にダメージ）
-    - 散発汚れ（ランダムな汚れ）
+    - Timing攻撃（タイミングパターンを狙う）
+    - Data汚損（データ領域に分散ダメージ）
+    - 全体劣化（全体に細かな汚れ）
+    - 角ステッカー（局所的な遮蔽）
+    - シード指定と同条件の再実行
+  - **画像劣化条件**
+    - ぼかし、コントラスト、回転
   - **読み取り結果パネル**
     - 状態：SUCCESS / FAIL / 未読込
     - 破損率（ダメージピクセル割合の概算）
@@ -242,7 +254,7 @@ QRCrashTestの実験結果を読み解くための **座学タブ** です。
 ## ⚠️ 実装上の注意・前提
 
 - 完全クライアントサイドで動作し、QR画像はブラウザー内でのみ扱われます。
-- 同梱サンプルもリポジトリー内から読み込み、QR生成APIへ内容を送信しません。jsQRとqrcode-generatorの読み込みにはCDNを利用します。
+- サンプルQRは同梱したqrcode-generatorでブラウザー内生成し、第三者のQR生成APIへ内容を送信しません。jsQRとqrcode-generatorもリポジトリー内から読み込むため、初回からオフラインで動作します。
 - QRの読み取りには [jsQR](https://github.com/cozmo/jsQR) を利用しています。
 - jsQRの仕様上、**誤り訂正レベル（L/M/Q/H）や詳細な内部構造を厳密に取得しているわけではありません**。  
   - そのため、本ツールで表示している「致命度ヒートマップ」「Finder/Timing/Data/Formatの領域」は、実際の仕様に沿いつつも簡略化した教育用モデルです。
@@ -302,24 +314,34 @@ qrcrashtest/
 │       └── test.yml     # Node.js 22で自動テスト
 ├── index.html          # メインHTMLファイル
 ├── qr-core.js          # QR座標表と幾何計算（DOM非依存）
+├── experiment-core.js  # シード付き乱数と画像劣化条件
+├── i18n.js             # 日本語・英語の表示切り替え
 ├── script.js           # 画面制御と描画処理
 ├── style.css           # スタイルシート（1,300行以上）
 ├── package.json        # テストコマンド
 ├── test/
 │   ├── document.test.js # 公開設定とHTMLの回帰テスト
+│   ├── experiment-core.test.js # シード再現性と画像劣化条件のテスト
+│   ├── i18n.test.js     # 主要な英訳の回帰テスト
 │   └── qr-core.test.js  # Version 1〜40と回転座標のテスト
 ├── README.md           # 本ドキュメント
+├── README.en.md        # English documentation
 ├── CLAUDE.md           # Claude Code開発ガイド
 ├── LICENSE             # ライセンスファイル
 ├── .nojekyll           # GitHub Pages用設定
 ├── .gitignore          # Git除外設定
-└── assets/             # 画像リソース
+├── assets/             # 画像リソース
     ├── screenshot1.png # スクリーンショット（クラッシュテスト）
     ├── screenshot2.png # スクリーンショット（QRコード解析）
     └── samples/        # サンプルQRコード画像
         ├── qr1.png
         ├── qr2.png
         └── qr_samples_memo.txt
+└── vendor/             # オフライン用の第三者ライブラリとライセンス
+    ├── jsQR.js
+    ├── qrcode.min.js
+    ├── LICENSE-jsQR.txt
+    └── LICENSE-qrcode-generator.txt
 ```
 
 ### 主要ファイルの説明
@@ -355,13 +377,14 @@ qrcrashtest/
 
 - ソースコードのライセンスは `LICENSE` ファイルを参照してください。
 - QRコード読み取りには [jsQR](https://github.com/cozmo/jsQR) を利用しており、そのライセンスに従います。
+- QRコード生成には [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) を利用しており、そのライセンスに従います。
 
 ---
 
 ## 🛠️ このツールについて
 
 本ツールは、「生成AIで作るセキュリティツール200」プロジェクトの一環として開発されました。
-このプロジェクトでは、AIの支援を活用しながら、セキュリティに関連するさまざまなツールを100日間にわたり制作・公開していく取り組みを行っています。
+このプロジェクトでは、AIの支援を活用しながら、セキュリティに関連するさまざまなツールを制作・公開しています。
 
 プロジェクトの詳細や他のツールについては、以下のページをご覧ください。
 
