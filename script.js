@@ -6,7 +6,7 @@
  * 主な機能:
  * - QRコード画像の読み込み（ファイル選択、ドラッグ&ドロップ、サンプル選択）
  * - ダメージ描画ツール（ペン、汚れブラシ、影、ステッカー、ノイズ）
- * - 攻撃シナリオプリセット（Finder破壊、Data破壊、全方位攻撃、散発汚れ）
+ * - シードで再現できる攻撃プリセットと画像劣化条件
  * - リアルタイムQRコード読み取り（jsQR使用）
  * - 構造レイヤー可視化（Finder/Timing/Format/Data/致命度ヒートマップ）
  * - 座学コンテンツ（QRコード構造と誤り訂正の解説）
@@ -81,10 +81,12 @@
 // Crash Testタブのキャンバス群（4層構造）
 const baseCanvas = document.getElementById("baseCanvas");           // 元のQR画像
 const overlayCanvas = document.getElementById("overlayCanvas");     // ダメージレイヤー
+const effectCanvas = document.getElementById("effectCanvas");
 const previewCanvas = document.getElementById("previewCanvas");     // 合成結果（非表示、jsQR読み取り用）
 const damageHeatmapCanvas = document.getElementById("damageHeatmapCanvas"); // ダメージヒートマップ
 const baseCtx = baseCanvas.getContext("2d");
 const overlayCtx = overlayCanvas.getContext("2d", { willReadFrequently: true });
+const effectCtx = effectCanvas.getContext("2d", { willReadFrequently: true });
 const previewCtx = previewCanvas.getContext("2d");
 const damageHeatmapCtx = damageHeatmapCanvas.getContext("2d");
 const noImageOverlay = document.getElementById("noImageOverlay");   // 「QRコード未読込」オーバーレイ
@@ -111,6 +113,7 @@ const dataScoreEl = document.getElementById("dataScore");           // Data領�
 // --- コントロール要素 ---
 // QRコード読み込み
 const fileInput = document.getElementById("fileInput");
+const fileName = document.getElementById("fileName");
 const sampleQrSelect = document.getElementById("sampleQrSelect");
 
 // ダメージツール設定
@@ -129,6 +132,18 @@ const currentToolName = document.getElementById("currentToolName");
 // その他のコントロール
 const clearOverlayButton = document.getElementById("clearOverlayButton"); // ダメージリセット
 const showDamageHeatmap = document.getElementById("showDamageHeatmap");   // ダメージヒートマップ表示
+const experimentSeed = document.getElementById("experimentSeed");
+const generateSeedButton = document.getElementById("generateSeedButton");
+const repeatExperimentButton = document.getElementById("repeatExperimentButton");
+const blurSlider = document.getElementById("blurSlider");
+const contrastSlider = document.getElementById("contrastSlider");
+const rotationSlider = document.getElementById("rotationSlider");
+const blurValue = document.getElementById("blurValue");
+const contrastValue = document.getElementById("contrastValue");
+const rotationValue = document.getElementById("rotationValue");
+const resultPreset = document.getElementById("resultPreset");
+const resultSeed = document.getElementById("resultSeed");
+const resultEffects = document.getElementById("resultEffects");
 
 // QR詳細情報（未使用の可能性あり）
 const imageSizeEl = document.getElementById("imageSize");
@@ -160,6 +175,8 @@ let originalImage = null;       // 元のQR画像（Imageオブジェクト）
 let qrDecodeResult = null;      // jsQRのデコード結果（location情報含む）
 let decodeScheduled = false;    // デコード処理がスケジュール済みか（連続実行防止）
 let analysisPerformed = false;  // 解析タブで「解析」ボタンが押されたか
+let lastPresetName = null;
+let currentStatus = { key: "notLoaded", decodedText: "" };
 
 // --- 描画ツール関連状態 ---
 let currentTool = "pen";        // 現在選択中のツール（pen/dust/shadow/mask/noise）
@@ -171,6 +188,10 @@ let maskStart = null;           // ステッカー描画の開始位置
 // メインコンテンツ要素
 const crashMainContent = document.getElementById("crashMainContent");
 const loadDropZone = document.getElementById("loadDropZone");
+
+function tr(text) {
+  return window.I18n ? window.I18n.t(text) : text;
+}
 
 // ============================================================
 // ユーティリティ関数
@@ -223,7 +244,15 @@ function hideLoading() {
  * @param {string} message - ステータスメッセージ（"SUCCESS", "FAIL", "読み取り準備完了"など）
  * @param {string} decodedText - 復号されたデータ（URLやテキスト）
  */
-function setStatus(message, decodedText) {
+function setStatus(key, decodedText) {
+  const messages = {
+    notLoaded: "未読込",
+    ready: "読み取り準備完了",
+    fail: "FAIL（読み取り不可）",
+    success: "SUCCESS（読み取り成功）"
+  };
+  currentStatus = { key, decodedText: decodedText || "" };
+  const message = tr(messages[key] || key);
   decodeStatusEl.textContent = message;
   decodedDataEl.textContent = decodedText || "";
 
@@ -243,6 +272,62 @@ function clearOverlay() {
   previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
   damageRatioEl.textContent = "-";
   updateDamageHeatmap();
+  updateEffectPreview();
+}
+
+function getEffects() {
+  return ExperimentCore.normalizeEffects({
+    blur: blurSlider.value,
+    contrast: contrastSlider.value,
+    rotation: rotationSlider.value
+  });
+}
+
+function renderComposite(targetCanvas, targetCtx) {
+  const effects = getEffects();
+  const source = document.createElement("canvas");
+  source.width = baseCanvas.width;
+  source.height = baseCanvas.height;
+  const sourceCtx = source.getContext("2d");
+  sourceCtx.drawImage(baseCanvas, 0, 0);
+  sourceCtx.drawImage(overlayCanvas, 0, 0);
+
+  targetCtx.save();
+  targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+  targetCtx.fillStyle = "#ffffff";
+  targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+  targetCtx.filter = `blur(${effects.blur}px) contrast(${effects.contrast}%)`;
+  targetCtx.translate(targetCanvas.width / 2, targetCanvas.height / 2);
+  targetCtx.rotate(effects.rotation * Math.PI / 180);
+  targetCtx.drawImage(source, -source.width / 2, -source.height / 2);
+  targetCtx.restore();
+  return effects;
+}
+
+function updateEffectPreview() {
+  const effects = renderComposite(effectCanvas, effectCtx);
+  const active = ExperimentCore.hasEffects(effects);
+  effectCanvas.classList.toggle("visible", active);
+  canvasDropZone.classList.toggle("effects-active", active);
+}
+
+const presetLabels = {
+  "finder-attack": "Finder破壊",
+  "timing-damage": "Timing攻撃",
+  "data-scatter": "Data汚損",
+  "global-dirt": "全体劣化",
+  "corner-sticker": "角ステッカー"
+};
+
+function updateExperimentSummary() {
+  const effects = getEffects();
+  resultPreset.textContent = lastPresetName ? tr(presetLabels[lastPresetName]) : tr("手動／なし");
+  resultSeed.textContent = ExperimentCore.normalizeSeed(experimentSeed.value);
+  const parts = [];
+  if (effects.blur) parts.push(`${tr("ぼかし")} ${effects.blur}px`);
+  if (effects.contrast !== 100) parts.push(`${tr("コントラスト")} ${effects.contrast}%`);
+  if (effects.rotation) parts.push(`${tr("回転")} ${effects.rotation}°`);
+  resultEffects.textContent = parts.length ? parts.join(" / ") : tr("なし");
 }
 
 function updateDamageHeatmap() {
@@ -307,12 +392,12 @@ function updateQrDetails(result, img) {
   if (result.location) {
     const version = result.version || 1;
     const moduleCount = 17 + 4 * version;
-    moduleCountEl.textContent = moduleCount > 0 ? `約 ${moduleCount}` : "不明";
+    moduleCountEl.textContent = moduleCount > 0 ? tr(`約 ${moduleCount}`) : tr("不明");
   } else {
-    moduleCountEl.textContent = "不明";
+    moduleCountEl.textContent = tr("不明");
   }
 
-  dataLengthEl.textContent = result.data ? `${result.data.length} 文字` : "0 文字";
+  dataLengthEl.textContent = tr(result.data ? `${result.data.length} 文字` : "0 文字");
 
   // パネルの高さを更新
   setTimeout(() => updatePanelHeights(), 10);
@@ -362,7 +447,7 @@ function calculateDamageRatio() {
 function decodeQrFromComposite() {
   decodeScheduled = false;
   if (!qrImageLoaded) {
-    setStatus("未読込", "");
+    setStatus("notLoaded", "");
     return;
   }
 
@@ -371,8 +456,7 @@ function decodeQrFromComposite() {
   tmpCanvas.height = baseCanvas.height;
   const tmpCtx = tmpCanvas.getContext("2d");
 
-  tmpCtx.drawImage(baseCanvas, 0, 0);
-  tmpCtx.drawImage(overlayCanvas, 0, 0);
+  renderComposite(tmpCanvas, tmpCtx);
 
   const imageData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
 
@@ -386,15 +470,15 @@ function decodeQrFromComposite() {
   qrDecodeResult = result || null;
 
   if (!result) {
-    setStatus("FAIL（読み取り不可）", "");
+    setStatus("fail", "");
     updateQrDetails(null, null);
     return;
   }
 
-  setStatus("SUCCESS（読み取り成功）", result.data || "");
-  versionEl.textContent = result.version ? String(result.version) : "不明";
+  setStatus("success", result.data || "");
+  versionEl.textContent = result.version ? String(result.version) : tr("不明");
   // ECCはライブラリから直接は取得できないため不明扱い
-  eccLevelEl.textContent = "不明";
+  eccLevelEl.textContent = tr("不明");
 
   if (originalImage) {
     updateQrDetails(result, originalImage);
@@ -406,6 +490,7 @@ function scheduleDecode() {
   if (!qrImageLoaded) return;
   if (decodeScheduled) return;
   decodeScheduled = true;
+  updateEffectPreview();
   // 少し待ってから実行（連続描画の負荷を軽減）
   setTimeout(() => {
     calculateDamageRatio();
@@ -451,13 +536,13 @@ function loadQRImage(file) {
 
         resizeAndDrawImageToCanvas(img, baseCanvas, baseCtx);
         clearOverlay();
-        setStatus("読み取り準備完了", "");
+        setStatus("ready", "");
 
         scheduleDecode();
 
         // 解析ボタンを有効化、領域描画をリセット
         analyzeButton.disabled = false;
-        analyzeHint.textContent = "ボタンを押してQRコードを解析します";
+        analyzeHint.textContent = tr("ボタンを押してQRコードを解析します");
         analysisPerformed = false;
 
         // 分析タブが開いている場合はQRコード画像のみ表示
@@ -476,6 +561,7 @@ function loadQRImage(file) {
 
 fileInput.addEventListener("change", (e) => {
   const file = e.target.files && e.target.files[0];
+  fileName.textContent = file ? file.name : tr("選択されていません");
   loadQRImage(file);
 });
 
@@ -496,7 +582,7 @@ function updateToolDisplay(toolValue) {
   const info = toolInfo[toolValue];
   if (info) {
     currentToolIcon.textContent = info.icon;
-    currentToolName.textContent = info.name;
+  currentToolName.textContent = tr(info.name);
 
     // カーソルスタイルを更新
     canvasDropZone.classList.remove("cursor-pen", "cursor-dust", "cursor-shadow", "cursor-mask", "cursor-noise");
@@ -736,6 +822,16 @@ function drawMaskRect(p1, p2) {
 // リセットボタン
 clearOverlayButton.addEventListener("click", () => {
   clearOverlay();
+  blurSlider.value = 0;
+  contrastSlider.value = 100;
+  rotationSlider.value = 0;
+  blurValue.textContent = "0";
+  contrastValue.textContent = "100";
+  rotationValue.textContent = "0";
+  lastPresetName = null;
+  repeatExperimentButton.disabled = true;
+  updateEffectPreview();
+  updateExperimentSummary();
   scheduleDecode();
 });
 
@@ -1120,7 +1216,7 @@ analyzeButton.addEventListener("click", () => {
   if (!qrImageLoaded || !originalImage || !qrDecodeResult) return;
 
   analysisPerformed = true;
-  analyzeHint.textContent = "✓ 解析完了 - 各レイヤーの表示/非表示を切り替えられます";
+  analyzeHint.textContent = tr("✓ 解析完了 - 各レイヤーの表示/非表示を切り替えられます");
   drawRegionOverlays();
 });
 
@@ -1133,10 +1229,10 @@ analyzeButton.addEventListener("click", () => {
 });
 
 // 初期状態
-setStatus("未読込", "");
+setStatus("notLoaded", "");
 damageRatioEl.textContent = "-";
-eccLevelEl.textContent = "不明";
-versionEl.textContent = "不明";
+eccLevelEl.textContent = tr("不明");
+versionEl.textContent = tr("不明");
 highRiskRatioEl.textContent = "-";
 finderScoreEl.textContent = "-";
 dataScoreEl.textContent = "-";
@@ -1233,9 +1329,30 @@ showDamageHeatmap.addEventListener("change", () => {
 // ===== サンプルQRコード選択 =====
 
 const sampleQRs = {
-  sample1: "assets/samples/qr1.png",
-  sample2: "assets/samples/qr2.png"
+  sample1: "https://hack.booth.pm/items/7517001",
+  sample2: "https://hack.booth.pm/items/6833516"
 };
+
+function createSampleDataUrl(value) {
+  const qr = qrcode(0, "M");
+  qr.addData(value);
+  qr.make();
+  const count = qr.getModuleCount();
+  const quiet = 4;
+  const scale = 12;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = (count + quiet * 2) * scale;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#000";
+  for (let row = 0; row < count; row++) {
+    for (let col = 0; col < count; col++) {
+      if (qr.isDark(row, col)) ctx.fillRect((col + quiet) * scale, (row + quiet) * scale, scale, scale);
+    }
+  }
+  return canvas.toDataURL("image/png");
+}
 
 sampleQrSelect.addEventListener("change", () => {
   const selected = sampleQrSelect.value;
@@ -1255,13 +1372,13 @@ sampleQrSelect.addEventListener("change", () => {
 
       resizeAndDrawImageToCanvas(img, baseCanvas, baseCtx);
       clearOverlay();
-      setStatus("読み取り準備完了", "");
+      setStatus("ready", "");
 
       scheduleDecode();
 
       // 解析ボタンを有効化、領域描画をリセット
       analyzeButton.disabled = false;
-      analyzeHint.textContent = "ボタンを押してQRコードを解析します";
+      analyzeHint.textContent = tr("ボタンを押してQRコードを解析します");
       analysisPerformed = false;
 
       // 分析タブが開いている場合はQRコード画像のみ表示
@@ -1273,10 +1390,10 @@ sampleQrSelect.addEventListener("change", () => {
       hideLoading();
     };
     img.onerror = () => {
-      alert("サンプルQRコードの読み込みに失敗しました。");
+      alert(tr("サンプルQRコードの読み込みに失敗しました。"));
       hideLoading();
     };
-    img.src = sampleQRs[selected];
+    img.src = createSampleDataUrl(sampleQRs[selected]);
   }, 0);
 });
 
@@ -1284,11 +1401,14 @@ sampleQrSelect.addEventListener("change", () => {
 
 function applyPreset(presetName) {
   if (!qrImageLoaded) {
-    alert("先にQRコード画像を読み込んでください。");
+    alert(tr("先にQRコード画像を読み込んでください。"));
     return;
   }
 
-  // clearOverlay()を削除 - 既存の状態に追加する
+  clearOverlay();
+  const seed = ExperimentCore.normalizeSeed(experimentSeed.value);
+  experimentSeed.value = seed;
+  const random = ExperimentCore.createSeededRandom(seed);
 
   const w = overlayCanvas.width;
   const h = overlayCanvas.height;
@@ -1307,8 +1427,8 @@ function applyPreset(presetName) {
 
     finderPositions = [
       { x: topLeft.x - finderSize / 2, y: topLeft.y - finderSize / 2 },
-      { x: topRight.x - finderSize / 2, y: topRight.y - finderSize / 2 },
-      { x: bottomLeft.x - finderSize / 2, y: bottomLeft.y - finderSize / 2 }
+      { x: metrics.topRight.x - finderSize / 2, y: metrics.topRight.y - finderSize / 2 },
+      { x: metrics.bottomLeft.x - finderSize / 2, y: metrics.bottomLeft.y - finderSize / 2 }
     ];
   } else {
     // フォールバック: 固定比率を使用
@@ -1324,10 +1444,10 @@ function applyPreset(presetName) {
   switch (presetName) {
     case "finder-attack":
       // ランダムにFinderを選んで集中攻撃
-      const targetFinder = finderPositions[Math.floor(Math.random() * 3)];
-      const attackSize = finderSize * (0.3 + Math.random() * 0.2); // 0.3-0.5
-      const offsetX = Math.random() * (finderSize - attackSize);
-      const offsetY = Math.random() * (finderSize - attackSize);
+      const targetFinder = finderPositions[Math.floor(random() * 3)];
+      const attackSize = finderSize * (0.3 + random() * 0.2); // 0.3-0.5
+      const offsetX = random() * (finderSize - attackSize);
+      const offsetY = random() * (finderSize - attackSize);
       overlayCtx.fillStyle = "#000000";
       overlayCtx.fillRect(
         targetFinder.x + offsetX,
@@ -1340,13 +1460,13 @@ function applyPreset(presetName) {
     case "data-scatter":
       // Data領域にランダムな汚れ（位置を毎回変える）
       overlayCtx.fillStyle = "rgba(80,80,80,0.6)";
-      const centerX = w * (0.25 + Math.random() * 0.2); // 0.25-0.45
-      const centerY = h * (0.25 + Math.random() * 0.2);
-      const scatterSize = w * (0.3 + Math.random() * 0.2); // 0.3-0.5
+      const centerX = w * (0.25 + random() * 0.2); // 0.25-0.45
+      const centerY = h * (0.25 + random() * 0.2);
+      const scatterSize = w * (0.3 + random() * 0.2); // 0.3-0.5
       for (let i = 0; i < 150; i++) {
-        const x = centerX + Math.random() * scatterSize;
-        const y = centerY + Math.random() * scatterSize;
-        const size = 2 + Math.random() * 4;
+        const x = centerX + random() * scatterSize;
+        const y = centerY + random() * scatterSize;
+        const size = 2 + random() * 4;
         overlayCtx.fillRect(x, y, size, size);
       }
       break;
@@ -1365,20 +1485,20 @@ function applyPreset(presetName) {
         const finderModuleSize = 7 * moduleSize;
 
         // 横または縦をランダムに選択
-        if (Math.random() > 0.5) {
+        if (random() > 0.5) {
           // 横のTiming
-          const startX = topLeft.x + finderModuleSize / 2 + Math.random() * (horizontalDistance - finderModuleSize) * 0.5;
-          const width = (horizontalDistance - finderModuleSize) * (0.2 + Math.random() * 0.3);
+          const startX = topLeft.x + finderModuleSize / 2 + random() * (horizontalDistance - finderModuleSize) * 0.5;
+          const width = (horizontalDistance - finderModuleSize) * (0.2 + random() * 0.3);
           overlayCtx.fillRect(startX, topLeft.y - moduleSize / 2 - 5, width, moduleSize + 10);
         } else {
           // 縦のTiming
-          const startY = topLeft.y + finderModuleSize / 2 + Math.random() * (verticalDistance - finderModuleSize) * 0.5;
-          const height = (verticalDistance - finderModuleSize) * (0.2 + Math.random() * 0.3);
+          const startY = topLeft.y + finderModuleSize / 2 + random() * (verticalDistance - finderModuleSize) * 0.5;
+          const height = (verticalDistance - finderModuleSize) * (0.2 + random() * 0.3);
           overlayCtx.fillRect(topLeft.x - moduleSize / 2 - 5, startY, moduleSize + 10, height);
         }
       } else {
         // フォールバック
-        if (Math.random() > 0.5) {
+        if (random() > 0.5) {
           overlayCtx.fillRect(margin + finderSize, margin + finderSize / 2 - 10, w - 2 * (margin + finderSize), 20);
         } else {
           overlayCtx.fillRect(margin + finderSize / 2 - 10, margin + finderSize, 20, h - 2 * (margin + finderSize));
@@ -1390,9 +1510,9 @@ function applyPreset(presetName) {
       // 全体的にランダムな劣化
       overlayCtx.fillStyle = "rgba(100,100,100,0.15)";
       for (let i = 0; i < 300; i++) {
-        const x = Math.random() * w;
-        const y = Math.random() * h;
-        const size = 1 + Math.random() * 3;
+        const x = random() * w;
+        const y = random() * h;
+        const size = 1 + random() * 3;
         overlayCtx.fillRect(x, y, size, size);
       }
       break;
@@ -1405,14 +1525,18 @@ function applyPreset(presetName) {
         { x: 0, y: h - 80 }, // 左下
         { x: w - 80, y: h - 80 } // 右下
       ];
-      const corner = corners[Math.floor(Math.random() * 4)];
-      const stickerSize = 60 + Math.random() * 40; // 60-100
-      const color = Math.random() > 0.5 ? "#ffffff" : "#000000";
+      const corner = corners[Math.floor(random() * 4)];
+      const stickerSize = 60 + random() * 40; // 60-100
+      const color = random() > 0.5 ? "#ffffff" : "#000000";
       overlayCtx.fillStyle = color;
       overlayCtx.fillRect(corner.x, corner.y, stickerSize, stickerSize);
       break;
   }
 
+  lastPresetName = presetName;
+  repeatExperimentButton.disabled = false;
+  updateEffectPreview();
+  updateExperimentSummary();
   scheduleDecode();
 }
 
@@ -1422,6 +1546,31 @@ document.querySelectorAll(".preset-button").forEach((btn) => {
     applyPreset(preset);
   });
 });
+
+generateSeedButton.addEventListener("click", () => {
+  const values = new Uint32Array(2);
+  crypto.getRandomValues(values);
+  experimentSeed.value = Array.from(values, value => value.toString(16).padStart(8, "0")).join("");
+  updateExperimentSummary();
+});
+
+repeatExperimentButton.addEventListener("click", () => {
+  if (lastPresetName) applyPreset(lastPresetName);
+});
+
+[blurSlider, contrastSlider, rotationSlider].forEach(control => {
+  control.addEventListener("input", () => {
+    const effects = getEffects();
+    blurValue.textContent = effects.blur;
+    contrastValue.textContent = effects.contrast;
+    rotationValue.textContent = effects.rotation;
+    updateEffectPreview();
+    updateExperimentSummary();
+    scheduleDecode();
+  });
+});
+
+experimentSeed.addEventListener("input", updateExperimentSummary);
 
 // ===== 学習タブのアコーディオン =====
 
@@ -1727,14 +1876,14 @@ function setupQRCoordinateDisplay() {
 
     // QRコードの範囲内かチェック
     if (moduleX >= 0 && moduleX < size && moduleY >= 0 && moduleY < size) {
-      coordinateDisplay.textContent = `座標: (${moduleX}, ${moduleY})`;
+      coordinateDisplay.textContent = tr(`座標: (${moduleX}, ${moduleY})`);
     } else {
-      coordinateDisplay.textContent = "座標: -";
+      coordinateDisplay.textContent = tr("座標: -");
     }
   });
 
   coloredQrDiagram.addEventListener("mouseleave", () => {
-    coordinateDisplay.textContent = "座標: -";
+    coordinateDisplay.textContent = tr("座標: -");
   });
 }
 
@@ -1742,3 +1891,18 @@ function setupQRCoordinateDisplay() {
 if (document.getElementById("coloredQrDiagram")) {
   setupQRCoordinateDisplay();
 }
+
+window.addEventListener("languagechange", () => {
+  setStatus(currentStatus.key, currentStatus.decodedText);
+  currentToolName.textContent = tr(toolInfo[currentTool].name);
+  eccLevelEl.textContent = tr("不明");
+  if (!qrDecodeResult || !qrDecodeResult.version) versionEl.textContent = tr("不明");
+  if (qrDecodeResult && originalImage) updateQrDetails(qrDecodeResult, originalImage);
+  analyzeHint.textContent = analysisPerformed
+    ? tr("✓ 解析完了 - 各レイヤーの表示/非表示を切り替えられます")
+    : tr(qrImageLoaded ? "ボタンを押してQRコードを解析します" : "左側でQRコードを読み込んでください");
+  updateExperimentSummary();
+  fileName.textContent = fileInput.files && fileInput.files[0] ? fileInput.files[0].name : tr("選択されていません");
+});
+
+updateExperimentSummary();

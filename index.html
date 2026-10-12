@@ -5,11 +5,12 @@
   <title>QRCrashTest - QRコード破壊耐性クラッシュテスト</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="strict-origin-when-cross-origin">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
+    <button id="languageToggle" class="language-toggle" type="button" aria-label="表示言語を英語に切り替える">English</button>
     <h1>QRCrashTest</h1>
     <p class="subtitle">QRコードに影・汚れ・欠損を与えて、構造と誤り訂正による読み取り耐性を可視化する教育ツール</p>
   </header>
@@ -36,7 +37,9 @@
             <h2>QRコード読み込み</h2>
             <div class="load-drop-zone" id="loadDropZone">
               <div class="file-input-row">
-                <input type="file" id="fileInput" accept="image/*">
+                <label class="file-picker-label" for="fileInput">ファイルを選択</label>
+                <input class="visually-hidden" type="file" id="fileInput" accept="image/*">
+                <span id="fileName" data-i18n-dynamic>選択されていません</span>
               </div>
               <p class="hint">
                 📁 PNG / JPG などのQRコード画像を読み込みます。<br>
@@ -79,6 +82,7 @@
             <div class="canvas-wrapper" id="canvasDropZone">
               <canvas id="baseCanvas" width="500" height="500"></canvas>
               <canvas id="overlayCanvas" width="500" height="500"></canvas>
+              <canvas id="effectCanvas" width="500" height="500"></canvas>
               <canvas id="previewCanvas" width="500" height="500"></canvas>
               <canvas id="damageHeatmapCanvas" width="500" height="500"></canvas>
               <div id="noImageOverlay" class="no-image-overlay">
@@ -218,7 +222,31 @@
           <div class="crash-presets-area">
             <section class="panel">
               <h2>攻撃シナリオプリセット</h2>
-              <p class="hint">押すたびにランダムな位置にダメージを追加します。</p>
+              <p class="hint">同じシードとプリセットは同じダメージを再現します。プリセット適用時は現在の描画を置き換えます。</p>
+
+              <div class="experiment-controls">
+                <div class="experiment-seed-row">
+                  <label for="experimentSeed"><strong>シード</strong></label>
+                  <input id="experimentSeed" type="text" value="day102" maxlength="64" autocomplete="off" spellcheck="false">
+                  <button id="generateSeedButton" type="button">新しいシード</button>
+                  <button id="repeatExperimentButton" type="button" disabled>同じ条件でもう一度</button>
+                </div>
+
+                <h3>撮影条件・幾何変形</h3>
+                <div class="effect-controls">
+                  <label>ぼかし <output id="blurValue">0</output>px
+                    <input id="blurSlider" type="range" min="0" max="8" step="1" value="0">
+                  </label>
+                  <label>コントラスト <output id="contrastValue">100</output>%
+                    <input id="contrastSlider" type="range" min="20" max="180" step="5" value="100">
+                  </label>
+                  <label>回転 <output id="rotationValue">0</output>°
+                    <input id="rotationSlider" type="range" min="-15" max="15" step="1" value="0">
+                  </label>
+                </div>
+              </div>
+
+              <h3 class="preset-category">構造攻撃</h3>
 
               <div class="preset-item">
                 <div class="preset-info">
@@ -230,18 +258,20 @@
 
               <div class="preset-item">
                 <div class="preset-info">
-                  <strong>💥 Data汚損</strong>
-                  <p class="preset-desc">Data領域に散発的な汚れを付着。誤り訂正があるため意外と読めてしまうことも。</p>
-                </div>
-                <button class="preset-button" data-preset="data-scatter">適用</button>
-              </div>
-
-              <div class="preset-item">
-                <div class="preset-info">
                   <strong>📏 Timing攻撃</strong>
                   <p class="preset-desc">横または縦のTimingパターンを破壊。モジュール位置の基準を狂わせる。</p>
                 </div>
                 <button class="preset-button" data-preset="timing-damage">適用</button>
+              </div>
+
+              <h3 class="preset-category">分散した欠損</h3>
+
+              <div class="preset-item">
+                <div class="preset-info">
+                  <strong>💥 Data汚損</strong>
+                  <p class="preset-desc">Data領域に散発的な汚れを付着。誤り訂正があるため意外と読めてしまうことも。</p>
+                </div>
+                <button class="preset-button" data-preset="data-scatter">適用</button>
               </div>
 
               <div class="preset-item">
@@ -252,6 +282,8 @@
                 <button class="preset-button" data-preset="global-dirt">適用</button>
               </div>
 
+              <h3 class="preset-category">局所的な遮蔽</h3>
+
               <div class="preset-item">
                 <div class="preset-info">
                   <strong>📌 角ステッカー</strong>
@@ -259,6 +291,17 @@
                 </div>
                 <button class="preset-button" data-preset="corner-sticker">適用</button>
               </div>
+
+              <section class="experiment-result" aria-live="polite">
+                <h3>実験条件</h3>
+                <dl>
+                  <div><dt>デコーダー</dt><dd>jsQR 1.4.0</dd></div>
+                  <div><dt>ダメージモデル</dt><dd id="resultPreset">手動／なし</dd></div>
+                  <div><dt>シード</dt><dd id="resultSeed">day102</dd></div>
+                  <div><dt>画像劣化</dt><dd id="resultEffects">なし</dd></div>
+                </dl>
+                <p class="experiment-limit">表示結果は、この画像をjsQRで1回読み取った結果です。他のカメラ、照明、印刷条件、デコーダーで同じ結果になることや、一般的な耐性を保証しません。</p>
+              </section>
 
             </section>
           </div>
@@ -812,11 +855,12 @@
     </div>
   </footer>
 
-  <!-- jsQR ライブラリ -->
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" integrity="sha384-b5Ya4Bq3qCyz39m2ISh+4DxjAIljdeFwK/BsXLuj9gugaNwAcj/ia15fxNZL9Nlx" crossorigin="anonymous"></script>
-  <!-- QRCode生成ライブラリ -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js" integrity="sha384-lQXOAyZwHXE55JFyrOMB7nY2Wv+m5ZWNtJcHrd1rceRQXAYNLak8ukN5TjBTcIwz" crossorigin="anonymous"></script>
+  <!-- 同梱ライブラリ（オフライン動作） -->
+  <script src="vendor/jsQR.js"></script>
+  <script src="vendor/qrcode.min.js"></script>
   <script src="qr-core.js"></script>
+  <script src="experiment-core.js"></script>
+  <script src="i18n.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
