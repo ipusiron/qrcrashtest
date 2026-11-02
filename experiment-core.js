@@ -50,5 +50,34 @@
     return effects.blur !== 0 || effects.contrast !== 100 || effects.rotation !== 0;
   }
 
-  return Object.freeze({ createSeededRandom, hashSeed, hasEffects, normalizeEffects, normalizeSeed });
+  // live領域へは、前と同じ文なら書かない（読み上げの重複を防ぐ）
+  function setTextIfChanged(element, text) {
+    const next = String(text);
+    if (!element || element.textContent === next) return false;
+    element.textContent = next;
+    return true;
+  }
+
+  const effectUnits = Object.freeze({ blur: "px", contrast: "%", rotation: "°" });
+
+  // スライダーのaria-valuetext用（単位つきの値）
+  function formatEffectValue(name, value) {
+    return `${value}${effectUnits[name] || ""}`;
+  }
+
+  // 「同じ条件でもう一度」は、プリセットを適用した後（リセット前）だけ押せる
+  function canRepeatPreset(lastPresetName) {
+    return typeof lastPresetName === "string" && lastPresetName !== "";
+  }
+
+  return Object.freeze({
+    canRepeatPreset,
+    createSeededRandom,
+    formatEffectValue,
+    hashSeed,
+    hasEffects,
+    normalizeEffects,
+    normalizeSeed,
+    setTextIfChanged
+  });
 });

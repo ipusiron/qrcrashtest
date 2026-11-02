@@ -334,6 +334,8 @@ main {
 }
 
 .experiment-seed-row button { min-height: 44px; }
+.repeat-note { margin-top: 0.5rem; color: #555; }
+.repeat-note[hidden] { display: none; }
 
 .effect-controls {
   display: grid;

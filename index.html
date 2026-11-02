@@ -230,19 +230,20 @@
                   <label for="experimentSeed"><strong>シード</strong></label>
                   <input id="experimentSeed" type="text" value="day102" maxlength="64" autocomplete="off" spellcheck="false">
                   <button id="generateSeedButton" type="button">新しいシード</button>
-                  <button id="repeatExperimentButton" type="button" disabled>同じ条件でもう一度</button>
+                  <button id="repeatExperimentButton" type="button" disabled aria-describedby="repeatExperimentNote">同じ条件でもう一度</button>
                 </div>
+                <p id="repeatExperimentNote" class="hint repeat-note">QRコード画像に攻撃シナリオプリセットを適用すると押せます。まだ適用していないときと、「ダメージをリセット」の後は押せません。</p>
 
                 <h3>撮影条件・幾何変形</h3>
                 <div class="effect-controls">
-                  <label>ぼかし <output id="blurValue">0</output>px
-                    <input id="blurSlider" type="range" min="0" max="8" step="1" value="0">
+                  <label>ぼかし <output id="blurValue" aria-live="off">0</output>px
+                    <input id="blurSlider" type="range" min="0" max="8" step="1" value="0" aria-valuetext="0px">
                   </label>
-                  <label>コントラスト <output id="contrastValue">100</output>%
-                    <input id="contrastSlider" type="range" min="20" max="180" step="5" value="100">
+                  <label>コントラスト <output id="contrastValue" aria-live="off">100</output>%
+                    <input id="contrastSlider" type="range" min="20" max="180" step="5" value="100" aria-valuetext="100%">
                   </label>
-                  <label>回転 <output id="rotationValue">0</output>°
-                    <input id="rotationSlider" type="range" min="-15" max="15" step="1" value="0">
+                  <label>回転 <output id="rotationValue" aria-live="off">0</output>°
+                    <input id="rotationSlider" type="range" min="-15" max="15" step="1" value="0" aria-valuetext="0°">
                   </label>
                 </div>
               </div>
