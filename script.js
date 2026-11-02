@@ -135,6 +135,7 @@ const showDamageHeatmap = document.getElementById("showDamageHeatmap");   // ダ
 const experimentSeed = document.getElementById("experimentSeed");
 const generateSeedButton = document.getElementById("generateSeedButton");
 const repeatExperimentButton = document.getElementById("repeatExperimentButton");
+const repeatExperimentNote = document.getElementById("repeatExperimentNote");
 const blurSlider = document.getElementById("blurSlider");
 const contrastSlider = document.getElementById("contrastSlider");
 const rotationSlider = document.getElementById("rotationSlider");
@@ -321,13 +322,44 @@ const presetLabels = {
 
 function updateExperimentSummary() {
   const effects = getEffects();
-  resultPreset.textContent = lastPresetName ? tr(presetLabels[lastPresetName]) : tr("手動／なし");
-  resultSeed.textContent = ExperimentCore.normalizeSeed(experimentSeed.value);
+  // 要約はaria-live領域なので、同じ文なら書き換えない
+  ExperimentCore.setTextIfChanged(resultPreset, lastPresetName ? tr(presetLabels[lastPresetName]) : tr("手動／なし"));
+  ExperimentCore.setTextIfChanged(resultSeed, ExperimentCore.normalizeSeed(experimentSeed.value));
   const parts = [];
   if (effects.blur) parts.push(`${tr("ぼかし")} ${effects.blur}px`);
   if (effects.contrast !== 100) parts.push(`${tr("コントラスト")} ${effects.contrast}%`);
   if (effects.rotation) parts.push(`${tr("回転")} ${effects.rotation}°`);
-  resultEffects.textContent = parts.length ? parts.join(" / ") : tr("なし");
+  ExperimentCore.setTextIfChanged(resultEffects, parts.length ? parts.join(" / ") : tr("なし"));
+}
+
+const effectOutputs = [
+  { name: "blur", slider: blurSlider, output: blurValue },
+  { name: "contrast", slider: contrastSlider, output: contrastValue },
+  { name: "rotation", slider: rotationSlider, output: rotationValue }
+];
+
+/**
+ * 画像劣化スライダーの表示値（aria-live="off"のoutput）とaria-valuetextを更新する。
+ * 読み上げ用のlive領域（実験条件の要約）には書かない。
+ */
+function syncEffectOutputs() {
+  const effects = getEffects();
+  effectOutputs.forEach(({ name, slider, output }) => {
+    ExperimentCore.setTextIfChanged(output, effects[name]);
+    const valueText = ExperimentCore.formatEffectValue(name, effects[name]);
+    if (slider.getAttribute("aria-valuetext") !== valueText) slider.setAttribute("aria-valuetext", valueText);
+  });
+}
+
+/**
+ * 「同じ条件でもう一度」の可否と、押せない理由の注記を同期する。
+ */
+function updateRepeatAvailability() {
+  const available = ExperimentCore.canRepeatPreset(lastPresetName);
+  repeatExperimentButton.disabled = !available;
+  repeatExperimentNote.hidden = available;
+  if (available) repeatExperimentButton.removeAttribute("aria-describedby");
+  else repeatExperimentButton.setAttribute("aria-describedby", repeatExperimentNote.id);
 }
 
 function updateDamageHeatmap() {
@@ -825,11 +857,9 @@ clearOverlayButton.addEventListener("click", () => {
   blurSlider.value = 0;
   contrastSlider.value = 100;
   rotationSlider.value = 0;
-  blurValue.textContent = "0";
-  contrastValue.textContent = "100";
-  rotationValue.textContent = "0";
+  syncEffectOutputs();
   lastPresetName = null;
-  repeatExperimentButton.disabled = true;
+  updateRepeatAvailability();
   updateEffectPreview();
   updateExperimentSummary();
   scheduleDecode();
@@ -1534,7 +1564,7 @@ function applyPreset(presetName) {
   }
 
   lastPresetName = presetName;
-  repeatExperimentButton.disabled = false;
+  updateRepeatAvailability();
   updateEffectPreview();
   updateExperimentSummary();
   scheduleDecode();
@@ -1559,15 +1589,14 @@ repeatExperimentButton.addEventListener("click", () => {
 });
 
 [blurSlider, contrastSlider, rotationSlider].forEach(control => {
+  // input中は見た目（表示値・プレビュー）とaria-valuetextだけを更新する
   control.addEventListener("input", () => {
-    const effects = getEffects();
-    blurValue.textContent = effects.blur;
-    contrastValue.textContent = effects.contrast;
-    rotationValue.textContent = effects.rotation;
+    syncEffectOutputs();
     updateEffectPreview();
-    updateExperimentSummary();
     scheduleDecode();
   });
+  // 読み上げ対象の要約は、操作の区切り（change）で1回だけ更新する
+  control.addEventListener("change", updateExperimentSummary);
 });
 
 experimentSeed.addEventListener("input", updateExperimentSummary);
@@ -1905,4 +1934,6 @@ window.addEventListener("languagechange", () => {
   fileName.textContent = fileInput.files && fileInput.files[0] ? fileInput.files[0].name : tr("選択されていません");
 });
 
+syncEffectOutputs();
+updateRepeatAvailability();
 updateExperimentSummary();
